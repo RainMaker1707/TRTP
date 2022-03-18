@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "wait_for_client.h"
+
 int wait_for_client(int sfd){
     char *buffer = (char*) malloc(sizeof(char*) * 528);
     if(!buffer) return -1;

@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "create_socket.h"
+
 void read_write_loop(int sfd){
     char * read_ = (char *)malloc(sizeof(char)*1024);
     char * write_ = (char *)malloc(sizeof(char)*1024);

@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "real_address.h"
+
 const char * real_address(const char *address, struct sockaddr_in6 *rval){
     // protocol setup
     struct addrinfo head;

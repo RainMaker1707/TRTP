@@ -1,60 +1,37 @@
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
 
-#include <netdb.h>
-
-#include <sys/time.h>
-#include <sys/select.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-
-#include <arpa/inet.h>
-
-#include <poll.h>
 
 #include <netinet/in.h>
-#include <unistd.h>
 #include <errno.h>
 
-#include "create_socket.h"
-
-void read_write_loop(int sfd){
-    char * read_ = (char *)malloc(sizeof(char)*1024);
-    char * write_ = (char *)malloc(sizeof(char)*1024);
-    // node structure for poll
-    struct pollfd fds[2];
-    fds[0].fd = sfd;
-    fds[0].events = POLLIN;
-    fds[1].fd = STDIN_FILENO;
-    fds[1].events=POLLIN;
-    // while we receive
-    while(!feof(stdin)){
-        // reset memory
-        memset((void *) read_, 0, sizeof(char)*1024);
-        memset((void *) write_, 0, sizeof(char)*1024);
-        int pol= poll(fds, 2, -1); //create poll
-        if (pol == -1) fprintf(stderr,"Poll error -- %s\n", strerror(errno));
-        // read poll input
-        if (fds[1].revents == POLLIN){
-            int read_stdin = read(STDIN_FILENO, (void *) write_, sizeof(char)*1024);
-            if (read_stdin == -1) fprintf(stderr,"Read input error -- %s\n", strerror(errno));
-            int write_sock = write(sfd, (void *) write_, read_stdin);
-            if (write_sock == -1) fprintf(stderr,"write socket error -- %s\n", strerror(errno));
-        }
-        // read socket input
-        if (fds[0].revents == POLLIN){
-            int read_sock = read(sfd, (void *) read_, sizeof(char)*1024);
-            if (read_sock == -1) fprintf(stderr,"read socket error: %s\n", strerror(errno));
-            int write_stdin = write(STDOUT_FILENO, (void *) read_, read_sock);
-            if (write_stdin == -1) fprintf(stderr,"write stdin error -- %s\n", strerror(errno));
+int create_socket(struct sockaddr_in6 *source_addr,int src_port,struct sockaddr_in6 *dest_addr,int dst_port){
+    // create socket
+    int socket_ = socket(AF_INET6, SOCK_DGRAM, 0);
+    if(socket_ == -1){
+        fprintf(stderr,"Create error: %s\n",strerror(errno));
+        return -1;
+    }
+    // bind socket
+    if(source_addr != NULL && src_port > 0){
+        source_addr->sin6_port=htons(src_port);
+        int bind_ = bind(socket_, (struct sockaddr *)source_addr, sizeof(struct sockaddr_in6));
+        if (bind_ == -1) {
+            fprintf(stderr,"Bind error: %s\n",strerror(errno));
+            return -1;
         }
     }
-    //garbage collector
-    free(read_);
-    free(write_);
+    // socket connection
+    if(dest_addr != NULL && dst_port>0){
+        dest_addr->sin6_port=htons(dst_port);
+        int connection = connect(socket_, (struct sockaddr *)dest_addr, sizeof(struct sockaddr_in6));
+        if (connection == -1) {
+            fprintf(stderr,"Connection error: %s\n",strerror(errno));
+            return -1;
+        }
+    }
+    return socket_;
 }

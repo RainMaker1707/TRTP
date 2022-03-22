@@ -225,7 +225,7 @@ pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t len
 }
 
 
-
+/*
 int main(int argc, char *argv[]){
     pkt_t *packet = (pkt_t*)malloc(sizeof(pkt_t));
     char *payload = "Hello, i'm the payload !";
@@ -248,3 +248,4 @@ int main(int argc, char *argv[]){
     printf("\n\tpkt->seqnum: %d\n\tpkt->length: %d\n\tpkt->payload: %s\n", decoded->seqnum, decoded->length, decoded->payload);
     return  EXIT_SUCCESS;
 }
+*/

@@ -10,8 +10,10 @@ CFLAGS += -D_COLOR
 LDFLAGS +=
 
 # Adapt these as you want to fit with your project
-SENDER_SOURCES = $(wildcard src/sender.c src/log.c)
-RECEIVER_SOURCES = $(wildcard src/receiver.c src/log.c)
+SENDER_SOURCES = $(wildcard src/sender.c src/log.c src/packet_implem.c src/create_socket.c src/read-write_loop.c \
+					src/wait_for_client.c src/real_address.c src/queue.c)
+RECEIVER_SOURCES = $(wildcard src/receiver.c src/log.c src/packet_implem.c src/create_socket.c src/read-write_loop.c \
+                    src/wait_for_client.c src/real_address.c, src/queue.c)
 
 SENDER_OBJECTS = $(SENDER_SOURCES:.c=.o)
 RECEIVER_OBJECTS = $(RECEIVER_SOURCES:.c=.o)
@@ -19,13 +21,14 @@ RECEIVER_OBJECTS = $(RECEIVER_SOURCES:.c=.o)
 SENDER = sender
 RECEIVER = receiver
 
+
 all: $(SENDER) $(RECEIVER)
 
 $(SENDER): $(SENDER_OBJECTS)
-	$(CC) $(SENDER_OBJECTS) -o $@ $(LDFLAGS)
+	$(CC) $(SENDER_OBJECTS) -o $@ $(LDFLAGS) -lz
 
 $(RECEIVER): $(RECEIVER_OBJECTS)
-	$(CC) $(RECEIVER_OBJECTS) -o $@ $(LDFLAGS)
+	$(CC) $(RECEIVER_OBJECTS) -o $@ $(LDFLAGS) -lz
 
 %.o: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
@@ -47,7 +50,7 @@ debug: CFLAGS += -D_DEBUG
 debug: clean all
 
 # Place the zip in the parent repository of the project
-ZIP_NAME="../projet1_nom1_nom2.zip"
+ZIP_NAME="../projet1_ALLEGAERT_LECHAT"
 
 # A zip target, to help you have a proper zip file. You probably need to adapt this code.
 zip:

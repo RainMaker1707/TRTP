@@ -6,7 +6,6 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <stdbool.h>
-#include <sys/time.h>
 #include <string.h>
 
 #include "log.h"
@@ -15,7 +14,6 @@
 #include "packet_interface.h"
 #include "wait_for_client.h"
 #include "queue.h"
-
 // TODO statistics
 
 int window_size = 1;
@@ -28,7 +26,7 @@ typedef enum {
     AOK = 0, /// All ok
     IGN = 1, /// Ignored
     END = 2, /// Reached EOF
-    ERR = 3, /// Other error
+    //ERR = 3, /// Other error
 }SYM;
 
 void pkt_set_ack_nack(pkt_t* ans, pkt_t* pkt){
@@ -64,7 +62,7 @@ bool checker(uint8_t seq){
 bool pkt_send(int sock, pkt_t* pkt){
     /// SEND packet
     size_t len = 10;
-    char buff[len];
+    char buff[len-1];
     if(pkt_encode(pkt, buff, &len) != PKT_OK) return false; // ERROR ON PACKET ENCODING
     ssize_t error = write(sock, buff, len);  // SEND PACKET
     if(error < 0) return false;
@@ -84,6 +82,7 @@ SYM answer(int sock, pkt_t* pkt){
     timestamp = pkt_get_timestamp(pkt);
     pkt_t* ans = pkt_new();
     fprintf(stderr, "Answering...\n");
+    fprintf(stderr, "pkt len = %d\n", pkt_get_length(pkt));
     if(pkt_get_tr(pkt)){ /// TRUNCATED PACKET
         if(checker(pkt_get_seqnum(pkt))){
             /// NEED TO NACK
@@ -103,11 +102,13 @@ SYM answer(int sock, pkt_t* pkt){
             node_t* to_push = node_new();
             to_push->pkt = pkt;
             queue_push(queue, to_push); // TODO real ordered storage
+            fprintf(stderr, "In sequence packet %d - %d\n", pkt_get_seqnum(pkt), last_seq);
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
                     /// LAST ACK
                     fprintf(stderr, "EOF ACK setup...\n");
                     pkt_set_ack(ans, pkt);
+                    fprintf(stderr, "EOF ACK set...\n");
                     if (pkt_send(sock, ans)) {
                         fprintf(stderr, "EOF ACK send with seq: %d\n", pkt_get_seqnum(ans));
                     }
@@ -125,6 +126,7 @@ SYM answer(int sock, pkt_t* pkt){
                             fprintf(stderr, "print payload seq %d\n", last_seq);
                         }else break;
                     }
+
                 }
                 pkt_set_ack(ans, pkt);
                 if(pkt_send(sock, ans)){

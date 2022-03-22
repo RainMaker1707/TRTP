@@ -78,7 +78,7 @@ bool ack_nack_dispatch(int sock){
     if(pkt_get_type(pkt) == PTYPE_ACK){
         fprintf(stderr, "ACK received\n");
         if(checker(seq_num, MAX_WINDOW_SIZE)){
-            fprintf(stderr, "Waited ACK -- head seq %d", pkt_get_seqnum(queue->head->pkt));
+            fprintf(stderr, "Waited ACK -- head seq %d\n", pkt_get_seqnum(queue->head->pkt));
             while(queue->head != NULL && seq_num > pkt_get_seqnum(queue->head->pkt)) {
                 free(queue_pop(queue));
                 seq_num += 0; /// ONLY TO AVOID WARNING NOT UPDATED
@@ -105,7 +105,7 @@ bool ack_nack_dispatch(int sock){
 
 int sender_agent(int sock, char* filename){
     bool finished = false;
-    struct pollfd poll_fd[1];
+    struct pollfd poll_fd[2];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     char buff[MAX_PAYLOAD_SIZE];
@@ -168,13 +168,13 @@ int sender_agent(int sock, char* filename){
     pkt_set_tr(pkt, 0);
     pkt_set_window(pkt, 0);
     pkt_set_length(pkt, 0);
-    pkt_set_seqnum(pkt, seq_num+1);
+    pkt_set_seqnum(pkt, seq_num);
     pkt_set_timestamp(pkt,0);
     pkt_set_payload(pkt,NULL,0);
     pkt_send(sock, pkt);
     pkt_del(pkt);
     if(filename)fclose(file);
-    return 1;
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {

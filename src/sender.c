@@ -51,6 +51,7 @@ bool checker(uint8_t seq, int window_size){
 }
 
 bool ack_nack_dispatch(int sock){
+    fprintf(stderr, "Sender receive something\n");
     pkt_t* pkt = pkt_new();
     char buff[10];
     ssize_t len = read(sock, buff, 10);
@@ -66,7 +67,8 @@ bool ack_nack_dispatch(int sock){
         pkt_del(pkt);
         return false;
     }
-    if(pkt_get_type(pkt) != PTYPE_DATA && pkt_get_type(pkt) != PTYPE_NACK){
+    if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
+        fprintf(stderr, "Not a ACK or NACK");
         pkt_del(pkt);
         return false;
     }
@@ -74,14 +76,19 @@ bool ack_nack_dispatch(int sock){
     uint8_t seq_num = pkt_get_seqnum(pkt);
     timestamp = pkt_get_timestamp(pkt);
     /// Free useless stored packet in queue
-    if(pkt_get_type(pkt) == PTYPE_ACK && checker(seq_num, MAX_WINDOW_SIZE)){
-        while(seq_num < pkt_get_seqnum(queue->head->pkt)) {
-            free(queue_pop(queue));
-            seq_num += 0; // ONLY TO AVOID WARNING NOT UPDATED
+    if(pkt_get_type(pkt) == PTYPE_ACK){
+        fprintf(stderr, "ACK received\n");
+        if(checker(seq_num, MAX_WINDOW_SIZE)){
+            while (seq_num < pkt_get_seqnum(queue->head->pkt)) {
+                free(queue_pop(queue));
+                seq_num += 0; // ONLY TO AVOID WARNING NOT UPDATED
+                fprintf(stderr, "ACK compute\n");
+            }
+            last_ack = pkt_get_seqnum(pkt);
         }
-        last_ack = pkt_get_seqnum(pkt);
     }if(pkt_get_type(pkt) == PTYPE_NACK){
         /// RESEND PACKET WITH NACK
+        fprintf(stderr, "NACK received\n");
         if(!checker((seq_num + 1) % 256, queue->maxSize)){
             pkt_del(pkt);
             return false;
@@ -96,21 +103,13 @@ bool ack_nack_dispatch(int sock){
 
 int sender_agent(int sock, char* filename){
     bool finished = false;
-    struct pollfd poll_fd[2];
+    struct pollfd poll_fd[1];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     char buff[MAX_PAYLOAD_SIZE];
     FILE* file;
     uint8_t seq_num = 0;
     if(filename) file = fopen(filename, "r");
-    /*
-    if(!filename) { /// if filename is given by STDIN
-        filename = malloc(sizeof(char)*700);
-        if(fgets(filename, sizeof(char)*700, stdin) == NULL) return EXIT_FAILURE;
-        else fprintf(stderr, "AOK: %s\n", filename);
-        return EXIT_FAILURE;
-    }
-    */
     fprintf(stderr, "%s\n", filename);
     while(!finished){
         /// READ file part by part
@@ -119,7 +118,6 @@ int sender_agent(int sock, char* filename){
             if(!filename && feof(stdin)) file_red = true;
             if(filename) red_len = fread(buff, sizeof(char), sizeof(buff), file);
             else red_len = read(STDIN_FILENO, buff, sizeof(buff)); // read on stdin if no filename
-            fprintf(stderr, "%s\n\n", buff);
             if(!red_len) file_red = true;
             else{
                 /// SETUP and SEND packet
@@ -138,7 +136,7 @@ int sender_agent(int sock, char* filename){
         }
         /// WAIT for ACK and NACK
         int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
-        if(poll_fdd > 1) ack_nack_dispatch(sock);
+        if(poll_fdd >= 1) ack_nack_dispatch(sock);
         /// SEND packet expired
         node_t* current = queue->head;
         while(current != NULL){

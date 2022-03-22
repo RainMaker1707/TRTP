@@ -103,11 +103,22 @@ int sender_agent(int sock, char* filename){
     FILE* file;
     uint8_t seq_num = 0;
     if(filename) file = fopen(filename, "r");
+    /*
+    if(!filename) { /// if filename is given by STDIN
+        filename = malloc(sizeof(char)*700);
+        if(fgets(filename, sizeof(char)*700, stdin) == NULL) return EXIT_FAILURE;
+        else fprintf(stderr, "AOK: %s\n", filename);
+        return EXIT_FAILURE;
+    }
+    */
     fprintf(stderr, "%s\n", filename);
     while(!finished){
         /// READ file part by part
         while(!file_red && queue->size < queue->maxSize){
-            size_t red_len = fread(buff, sizeof(char), sizeof(buff) -1, file); // SEGFAULT
+            size_t red_len;
+            if(!filename && feof(stdin)) file_red = true;
+            if(filename) red_len = fread(buff, sizeof(char), sizeof(buff), file);
+            else red_len = read(STDIN_FILENO, buff, sizeof(buff)); // read on stdin if no filename
             fprintf(stderr, "%s\n\n", buff);
             if(!red_len) file_red = true;
             else{

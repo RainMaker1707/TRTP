@@ -141,14 +141,14 @@ int sender_agent(int sock, char* filename){
             }
         }
         /// WAIT for ACK and NACK
-        int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
+        int poll_fdd = poll(poll_fd, 3, 20000); // 0 == no timeout
         if(poll_fdd >= 1) ack_nack_dispatch(sock);
         /// SEND packet expired
         node_t* current = queue->head;
         while(current != NULL){
-            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 5000) {
+            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 4000) {
                 pkt_send(sock, current->pkt);
-                fprintf(stderr, "\nResent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
+                fprintf(stderr, "Resent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
             }
             current = current->next;
         }
@@ -160,6 +160,7 @@ int sender_agent(int sock, char* filename){
             }
             finished = true;
         }
+        usleep(500);
     }
     /// FINAL SEND
     fprintf(stderr, "Send final packet EOF reached with seq: %d\n", last_ack);
@@ -188,19 +189,19 @@ int main(int argc, char **argv) {
     uint16_t receiver_port;
     while ((opt = getopt(argc, argv, "f:s:hc")) != -1) {
         switch (opt) {
-            case 'f':
-                filename = optarg;
-                break;
-            case 'h':
-                return print_usage(argv[0]);
-            case 's':
-                stats_filename = optarg;
-                break;
-            case 'c':
-                fec_enabled = true;
-                break;
-            default:
-                return print_usage(argv[0]);
+        case 'f':
+            filename = optarg;
+            break;
+        case 'h':
+            return print_usage(argv[0]);
+        case 's':
+            stats_filename = optarg;
+            break;
+	case 'c':
+	    fec_enabled = true;
+	    break;
+        default:
+            return print_usage(argv[0]);
         }
     }
 
@@ -221,7 +222,7 @@ int main(int argc, char **argv) {
 
     // This is not an error per-se.
     ERROR("Sender has following arguments: filename is %s, stats_filename is %s, fec_enabled is %d, receiver_ip is %s, receiver_port is %u",
-          filename, stats_filename, fec_enabled, receiver_ip, receiver_port);
+        filename, stats_filename, fec_enabled, receiver_ip, receiver_port);
 
     DEBUG("You can only see me if %s", "you built me using `make debug`");
     ERROR("This is not an error, %s", "now let's code!");
@@ -236,6 +237,6 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, 1);
+    setup_queue(queue, 5);
     return sender_agent(sock, filename);
 }

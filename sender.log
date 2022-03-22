@@ -1,0 +1,9 @@
+[91m[ERROR] Sender has following arguments: filename is (null), stats_filename is (null), fec_enabled is 0, receiver_ip is ::1, receiver_port is 1341[0m
+[91m[ERROR] This is not an error, now let's code![0m
+(null)
+Send packet ->0
+Queue size (on push): 1
+Resent packet TO -> 0
+Resent packet TO -> 0
+Queue size (on TO): 1
+Send final packet EOF reached with seq: 0

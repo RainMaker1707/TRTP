@@ -1,4 +1,3 @@
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -115,7 +114,7 @@ SYM answer(int sock, pkt_t* pkt){
                     return END;
                 } else {
                     /// WRITE sequence payload
-                    for(int _ = 0; _ < queue->size; _++){
+                   for(int _ = 0; _ < queue->size; _++){
                         if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
                             node_t* to_print = queue_pop(queue);
                             printf("%s", pkt_get_payload(to_print->pkt));
@@ -177,7 +176,7 @@ int receiver_agent(int sock){
                     fprintf(stderr, "Packet %d reached end", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                     finished = true;
-                }else fprintf(stderr, "Packet %d ACK\n", pkt_get_seqnum(pkt));
+                }else fprintf(stderr, "Packer %d ACK", pkt_get_seqnum(pkt));
             }
         }
         memset(buff, 0, MAX_PAYLOAD_SIZE);
@@ -195,13 +194,13 @@ int main(int argc, char **argv) {
 
     while ((opt = getopt(argc, argv, "s:h")) != -1) {
         switch (opt) {
-            case 'h':
-                return print_usage(argv[0]);
-            case 's':
-                stats_filename = optarg;
-                break;
-            default:
-                return print_usage(argv[0]);
+        case 'h':
+            return print_usage(argv[0]);
+        case 's':
+            stats_filename = optarg;
+            break;
+        default:
+            return print_usage(argv[0]);
         }
     }
 
@@ -222,7 +221,7 @@ int main(int argc, char **argv) {
 
     // This is not an error per-se.
     ERROR("Receiver has following arguments: stats_filename is %s, listen_ip is %s, listen_port is %u",
-          stats_filename, listen_ip, listen_port);
+        stats_filename, listen_ip, listen_port);
 
     DEBUG("You can only see me if %s", "you built me using `make debug`");
     ERROR("This is not an error, %s", "now let's code!");

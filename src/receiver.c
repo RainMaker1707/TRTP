@@ -61,18 +61,14 @@ bool pkt_send(int sock, pkt_t* pkt){
     /// SEND packet
     size_t len = 10;
     char buff[len];
-    fprintf(stderr, "here\n");
-    if(pkt_encode(pkt, buff, &len) != PKT_OK) {
-        fprintf(stderr, "error here\n");
-        return false; // ERROR ON PACKET ENCODING
-    }
-    fprintf(stderr, "there\n");
+    if(pkt_encode(pkt, buff, &len) != PKT_OK) return false; // ERROR ON PACKET ENCODING
     ssize_t error = write(sock, buff, len);  // SEND PACKET
     if(error < 0) return false;
     return true;
 }
 
 SYM answer(int sock, pkt_t* pkt){
+    fprintf(stderr, "Answering\n");
     if(pkt_get_type(pkt) != PTYPE_DATA){
         fprintf(stderr, "Packet is not a data packet\n");
         return IGN;
@@ -107,6 +103,7 @@ SYM answer(int sock, pkt_t* pkt){
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
                     /// LAST ACK
+                    fprintf(stderr, "EOF ACK setup...\n");
                     pkt_set_ack(ans, pkt);
                     if (pkt_send(sock, ans)) {
                         fprintf(stderr, "EOF ACK send with seq: %d\n", pkt_get_seqnum(ans));
@@ -115,6 +112,7 @@ SYM answer(int sock, pkt_t* pkt){
                     return END;
                 } else {
                     /// WRITE sequence payload
+                    // todo segfault here
                     while(queue_get_head(queue)){
                         if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
                             node_t* to_print = queue_pop(queue);
@@ -126,7 +124,7 @@ SYM answer(int sock, pkt_t* pkt){
                     }
                 }
                 pkt_set_ack(ans, pkt);
-                if(pkt_send(sock, pkt)){
+                if(pkt_send(sock, ans)){
                     fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
                 }else {
                     pkt_del(ans);
@@ -134,7 +132,7 @@ SYM answer(int sock, pkt_t* pkt){
                 }
             }else{ /// IGNORE paket not in sequence
                 pkt_set_ack(ans, pkt);
-                if(pkt_send(sock, pkt)){
+                if(pkt_send(sock, ans)){
                     fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
                 }
                 pkt_del(ans);

@@ -51,7 +51,6 @@ bool checker(uint8_t seq, int window_size){
 }
 
 bool ack_nack_dispatch(int sock){
-    fprintf(stderr, "Sender receive something\n");
     pkt_t* pkt = pkt_new();
     char buff[10];
     ssize_t len = read(sock, buff, 10);
@@ -68,7 +67,7 @@ bool ack_nack_dispatch(int sock){
         return false;
     }
     if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
-        fprintf(stderr, "Not a ACK or NACK\n");
+        fprintf(stderr, "Not a ACK or NACK, %d\n", pkt_get_type(pkt));
         pkt_del(pkt);
         return false;
     }
@@ -81,10 +80,11 @@ bool ack_nack_dispatch(int sock){
         if(checker(seq_num, MAX_WINDOW_SIZE)){
             while (seq_num < pkt_get_seqnum(queue->head->pkt)) {
                 free(queue_pop(queue));
-                seq_num += 0; // ONLY TO AVOID WARNING NOT UPDATED
+                seq_num += 0; /// ONLY TO AVOID WARNING NOT UPDATED
                 fprintf(stderr, "ACK compute\n");
             }
             last_ack = pkt_get_seqnum(pkt);
+            fprintf(stderr, "Last ack: %d\n", last_ack);
         }
     }if(pkt_get_type(pkt) == PTYPE_NACK){
         /// RESEND PACKET WITH NACK
@@ -96,6 +96,7 @@ bool ack_nack_dispatch(int sock){
         node_t* current = queue->head;
         while(pkt_get_seqnum(current->pkt) != seq_num) current = current->next;
         pkt_send(sock, current->pkt);
+        fprintf(stderr, "Resent packet n: %d\n", pkt_get_seqnum(current->pkt));
     }
     pkt_del(pkt);
     return true;
@@ -151,8 +152,9 @@ int sender_agent(int sock, char* filename){
 
     }
     /// FINAL SEND
+    fprintf(stderr, "Send final packet EOF reached with seq: %d\n", last_ack);
     pkt_t *pkt = pkt_new();
-    pkt_set_type(pkt, 1);
+    pkt_set_type(pkt, PTYPE_DATA);
     pkt_set_tr(pkt, 0);
     pkt_set_window(pkt, 0);
     pkt_set_length(pkt, 0);
@@ -224,6 +226,6 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, 1);
+    setup_queue(queue, 3);
     return sender_agent(sock, filename);
 }

@@ -2,3 +2,9 @@
 *.o
 
 .idea/
+
+test_file.txt
+
+log.txt
+
+sender

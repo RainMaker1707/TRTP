@@ -18,7 +18,7 @@
 uint32_t timestamp;
 bool file_red = false;
 queue_t* queue;
-uint8_t last_ack = -1;
+uint8_t last_ack = 0;
 //TODO statistics
 
 int print_usage(char *prog_name) {
@@ -78,10 +78,11 @@ bool ack_nack_dispatch(int sock){
     if(pkt_get_type(pkt) == PTYPE_ACK){
         fprintf(stderr, "ACK received\n");
         if(checker(seq_num, MAX_WINDOW_SIZE)){
-            while (seq_num < pkt_get_seqnum(queue->head->pkt)) {
+            fprintf(stderr, "Waited ACK");
+            while(queue->head != NULL && seq_num < pkt_get_seqnum(queue->head->pkt)) {
                 free(queue_pop(queue));
                 seq_num += 0; /// ONLY TO AVOID WARNING NOT UPDATED
-                fprintf(stderr, "ACK compute\n");
+                fprintf(stderr, "ACK compute, queue size: %d\n", queue_get_size(queue));
             }
             last_ack = pkt_get_seqnum(pkt);
             fprintf(stderr, "Last ack: %d\n", last_ack);
@@ -117,8 +118,8 @@ int sender_agent(int sock, char* filename){
         while(!file_red && queue->size < queue->maxSize){
             size_t red_len;
             if(!filename && feof(stdin)) file_red = true;
-            if(filename) red_len = fread(buff, sizeof(char), sizeof(buff), file);
-            else red_len = read(STDIN_FILENO, buff, sizeof(buff)); // read on stdin if no filename
+            if(filename) red_len = fread(buff, sizeof(char), sizeof(buff)-1, file);
+            else red_len = read(STDIN_FILENO, buff, sizeof(buff)-1); // read on stdin if no filename
             if(!red_len) file_red = true;
             else{
                 /// SETUP and SEND packet
@@ -131,22 +132,32 @@ int sender_agent(int sock, char* filename){
                 pkt_set_timestamp(pkt, 0); // NEED TO BE UPDATED
                 pkt_set_payload(pkt, buff, red_len); // SETTING UP BUFFER TO PAYLOAD
                 seq_num = (seq_num + 1) % 256; // UPDATE SEQNUM 256 because 8 bits count at 255 max.
-                if(pkt_send(sock, pkt)) queue_push_pkt(queue, pkt);
+                fprintf(stderr, "Send packet ->%d\n", pkt_get_seqnum(pkt));
+                if(pkt_send(sock, pkt)) {
+                    queue_push_pkt(queue, pkt);
+                    fprintf(stderr, "Queue size (on push): %d\n", queue_get_size(queue));
+                }
                 memset(buff, 0, red_len);
             }
         }
         /// WAIT for ACK and NACK
-        int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
+        int poll_fdd = poll(poll_fd, 3, 20000); // 0 == no timeout
         if(poll_fdd >= 1) ack_nack_dispatch(sock);
         /// SEND packet expired
         node_t* current = queue->head;
         while(current != NULL){
-            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 4000) pkt_send(sock, current->pkt);
+            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 5000) {
+                pkt_send(sock, current->pkt);
+                fprintf(stderr, "Resent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
+            }
             current = current->next;
         }
         if(file_red && queue->size == 0) finished = true;
         if(get_timestamp() - timestamp >= 30000) { /// FORCE STOP after 30s
-            while(queue->size > 0) free(queue_pop(queue));
+            while(queue->size > 0) {
+                fprintf(stderr, "Queue size (on TO): %d\n", queue_get_size(queue));
+                free(queue_pop(queue));
+            }
             finished = true;
         }
 
@@ -158,7 +169,7 @@ int sender_agent(int sock, char* filename){
     pkt_set_tr(pkt, 0);
     pkt_set_window(pkt, 0);
     pkt_set_length(pkt, 0);
-    pkt_set_seqnum(pkt, last_ack);
+    pkt_set_seqnum(pkt, seq_num+1);
     pkt_set_timestamp(pkt,0);
     pkt_set_payload(pkt,NULL,0);
     pkt_send(sock, pkt);
@@ -226,6 +237,6 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, 3);
+    setup_queue(queue, 1);
     return sender_agent(sock, filename);
 }

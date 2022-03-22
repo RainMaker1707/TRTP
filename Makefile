@@ -59,3 +59,11 @@ zip:
 	zip -r $(ZIP_NAME) Makefile README.md src tests rapport.pdf gitlog.stat
 	# We remove it now, but you can leave it if you want.
 	rm gitlog.stat
+
+run_sender:
+	make all
+	./sender ::1 12345 2>log.txt <test_file.txt
+
+run_receiver:
+	make all
+	./receiver :: 12345 2>receiver.txt

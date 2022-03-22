@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <stdbool.h>
+#include <sys/time.h>
+#include <string.h>
 
 #include "log.h"
 #include "create_socket.h"
@@ -14,6 +16,7 @@
 #include "queue.h"
 
 // TODO statistics
+
 int window_size = 1;
 int last_seq = -1;
 uint32_t timestamp;
@@ -68,7 +71,6 @@ bool pkt_send(int sock, pkt_t* pkt){
 }
 
 SYM answer(int sock, pkt_t* pkt){
-    fprintf(stderr, "Answering\n");
     if(pkt_get_type(pkt) != PTYPE_DATA){
         fprintf(stderr, "Packet is not a data packet\n");
         return IGN;
@@ -77,9 +79,10 @@ SYM answer(int sock, pkt_t* pkt){
         fprintf(stderr,"Packet too long\n");
         return IGN;
     }
+    fprintf(stderr, "Answering.\n");
     timestamp = pkt_get_timestamp(pkt);
-    bool stored = false;
     pkt_t* ans = pkt_new();
+    fprintf(stderr, "Answering...\n");
     if(pkt_get_tr(pkt)){ /// TRUNCATED PACKET
         if(checker(pkt_get_seqnum(pkt))){
             /// NEED TO NACK
@@ -99,7 +102,6 @@ SYM answer(int sock, pkt_t* pkt){
             node_t* to_push = node_new();
             to_push->pkt = pkt;
             queue_push(queue, to_push); // TODO real ordered storage
-            stored = true;
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
                     /// LAST ACK
@@ -113,7 +115,7 @@ SYM answer(int sock, pkt_t* pkt){
                 } else {
                     /// WRITE sequence payload
                     // todo segfault here
-                    while(queue_get_head(queue)){
+                   for(int _ = 0; _ < queue->size; _++){
                         if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
                             node_t* to_print = queue_pop(queue);
                             printf("%s", pkt_get_payload(to_print->pkt));
@@ -130,17 +132,16 @@ SYM answer(int sock, pkt_t* pkt){
                     pkt_del(ans);
                     return IGN;
                 }
-            }else{ /// IGNORE paket not in sequence
-                pkt_set_ack(ans, pkt);
-                if(pkt_send(sock, ans)){
-                    fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
-                }
-                pkt_del(ans);
-                return IGN;
             }
+        }else{ /// IGNORE packet not in sequence
+            pkt_set_ack(ans, pkt);
+            if(pkt_send(sock, ans)){
+                fprintf(stderr, "IGN ACK sent with seq: %d\n", pkt_get_seqnum(ans));
+            }
+            pkt_del(ans);
+            return IGN;
         }
     }
-    if(!stored) pkt_del(pkt);
     pkt_del(ans);
     return AOK;
 }
@@ -162,11 +163,11 @@ int receiver_agent(int sock){
                 pkt_del(pkt);
                 /// IGNORE packet
             }else{
-                fprintf(stderr, "PKT_OK -> %d\n", pkt_get_seqnum(pkt));
+                fprintf(stderr, "PKT_OK we wait for -> %d\n", next_seq());
                 /// ACK and NACK
                 SYM flag = answer(sock, pkt);
                 if(flag == IGN){
-                    fprintf(stderr, "Packet %d ignored", pkt_get_seqnum(pkt));
+                    fprintf(stderr, "Packet %d ignored\n", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                 }else if(flag == END){
                     fprintf(stderr, "Packet %d reached end", pkt_get_seqnum(pkt));
@@ -175,13 +176,14 @@ int receiver_agent(int sock){
                 }
             }
         }
+        memset(buff, 0, MAX_PAYLOAD_SIZE);
     }
+    free(queue);
     return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
     int opt;
-
     char *stats_filename = NULL;
     char *listen_ip = NULL;
     char *listen_port_err;

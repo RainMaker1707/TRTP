@@ -1,7 +1,7 @@
-#include "queue.h"
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
+#include <stdio.h>
+
+#include "queue.h"
 
 /*
  * This file is an ADT for a pkt linked list FIFO, using two struct
@@ -15,7 +15,6 @@ queue_t* queue_new(){
     queue->size = 0;
     queue->maxSize = 1;
     queue->head = NULL;
-    queue->current = NULL;
     queue->tail = NULL;
     return queue;
 }
@@ -50,23 +49,19 @@ node_t* queue_get_tail(queue_t* queue){
     return queue->tail;
 }
 
-node_t* queue_get_current(queue_t* queue){
-    return queue->current;
-}
-
 void queue_push(queue_t* queue, node_t* to_push){
     if(!queue || !to_push) return;
     if(queue->size == queue->maxSize) return;
     if(queue->size == 0){
         queue->head = to_push;
         queue->tail = to_push;
-        queue->current = to_push;
         queue->size = 1;
 
     }else {
         queue->tail->next = to_push;
         queue->tail = to_push;
         queue->size += 1;
+        fprintf(stderr, "INQUEUE");
     }
 }
 
@@ -93,7 +88,6 @@ int main(int argc, char* argv[]){
     printf("queue size: %d\n", queue_get_size(queue));
     queue_push(queue, node_new());
     printf("queue size: %d\n", queue_get_size(queue));
-    queue->current = queue->head;
     while(queue_pop(queue)) printf("POP\n");
     return EXIT_SUCCESS;
 }

@@ -62,7 +62,7 @@ zip:
 
 run_sender:
 	make all
-	./sender ::1 12345 2>log.txt <test_file.txt
+	./sender ::1 12345 2>log.txt < scribe.txt
 
 run_receiver:
 	make all

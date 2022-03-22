@@ -68,7 +68,7 @@ bool ack_nack_dispatch(int sock){
         return false;
     }
     if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
-        fprintf(stderr, "Not a ACK or NACK");
+        fprintf(stderr, "Not a ACK or NACK\n");
         pkt_del(pkt);
         return false;
     }

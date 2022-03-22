@@ -15,19 +15,46 @@
 
 // TODO statistics
 int window_size = 1;
+int last_seq = -1;
+uint32_t timestamp;
+int next_seq(){return (last_seq+1)%256;} /// %256 because seq num is on 8 bits
+queue_t* queue;
 
+typedef enum {
+    AOK = 0, /// All ok
+    IGN = 1, /// Ignored
+    END = 2, /// Reached EOF
+    ERR = 3, /// Other error
+}SYM;
+
+void pkt_set_ack_nack(pkt_t* ans, pkt_t* pkt){
+    pkt_set_tr(ans, 0);
+    pkt_set_window(ans, window_size);
+    pkt_set_timestamp(ans, pkt_get_timestamp(pkt));
+}
+
+void pkt_set_nack(pkt_t* ans, pkt_t* pkt){
+    pkt_set_type(ans, PTYPE_NACK);
+    pkt_set_seqnum(ans, pkt_get_seqnum(pkt));
+    pkt_set_ack_nack(ans, pkt);
+}
+
+void pkt_set_ack(pkt_t* ans, pkt_t* pkt){
+    pkt_set_type(ans, PTYPE_ACK);
+    pkt_set_seqnum(ans, next_seq());
+    pkt_set_ack_nack(ans, pkt);
+}
 
 int print_usage(char *prog_name) {
     ERROR("Usage:\n\t%s [-s stats_filename] listen_ip listen_port", prog_name);
     return EXIT_FAILURE;
 }
 
-void pkt_set_ack(pkt_t* ans, pkt_t* pkt){
-    pkt_set_type(ans, PTYPE_ACK);
-    pkt_set_tr(ans, 0);
-    pkt_set_seqnum(ans, pkt_get_seqnum(pkt));
-    pkt_set_window(ans, window_size);
-    pkt_set_timestamp(ans, pkt_get_timestamp(pkt));
+bool checker(uint8_t seq){
+    /// Check if seqnum is in sequence
+    if(seq == last_seq) return false;
+    if(seq > last_seq || seq <= (last_seq + window_size)%256) return true;
+    return false;
 }
 
 bool pkt_send(int sock, pkt_t* pkt){
@@ -45,7 +72,82 @@ bool pkt_send(int sock, pkt_t* pkt){
     return true;
 }
 
-int receiver_agent(int sock){//TODO add int sock as param
+SYM answer(int sock, pkt_t* pkt){
+    if(pkt_get_type(pkt) != PTYPE_DATA){
+        fprintf(stderr, "Packet is not a data packet\n");
+        return IGN;
+    }
+    if(pkt_get_length(pkt) > MAX_PAYLOAD_SIZE){
+        fprintf(stderr,"Packet too long\n");
+        return IGN;
+    }
+    timestamp = pkt_get_timestamp(pkt);
+    bool stored = false;
+    pkt_t* ans = pkt_new();
+    if(pkt_get_tr(pkt)){ /// TRUNCATED PACKET
+        if(checker(pkt_get_seqnum(pkt))){
+            /// NEED TO NACK
+            if(window_size > 1) window_size /= 2;
+            pkt_set_nack(ans, pkt);
+            if(!pkt_send(sock, ans)) {
+                pkt_del(ans);
+                fprintf(stderr, "NACK send with  seq: %d\n", pkt_get_seqnum(ans));
+                return IGN;
+            }
+        }else {
+            pkt_del(ans);
+            return IGN;
+        }
+    }else{ /// NOT TRUNCATED PACKET
+        if(checker(pkt_get_seqnum(pkt))){
+            node_t* to_push = node_new();
+            to_push->pkt = pkt;
+            queue_push(queue, to_push); // TODO real ordered storage
+            stored = true;
+            if(pkt_get_seqnum(pkt) == next_seq()) {
+                if (pkt_get_length(pkt) == 0) {
+                    /// LAST ACK
+                    pkt_set_ack(ans, pkt);
+                    if (pkt_send(sock, ans)) {
+                        fprintf(stderr, "EOF ACK send with seq: %d\n", pkt_get_seqnum(ans));
+                    }
+                    pkt_del(ans);
+                    return END;
+                } else {
+                    /// WRITE sequence payload
+                    while(queue_get_head(queue)){
+                        if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
+                            node_t* to_print = queue_pop(queue);
+                            printf("%s", pkt_get_payload(to_print->pkt));
+                            free(to_print);
+                            last_seq++;
+                            last_seq %= 256;
+                        }else break;
+                    }
+                }
+                pkt_set_ack(ans, pkt);
+                if(pkt_send(sock, pkt)){
+                    fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
+                }else {
+                    pkt_del(ans);
+                    return IGN;
+                }
+            }else{ /// IGNORE paket not in sequence
+                pkt_set_ack(ans, pkt);
+                if(pkt_send(sock, pkt)){
+                    fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
+                }
+                pkt_del(ans);
+                return IGN;
+            }
+        }
+    }
+    if(!stored) pkt_del(pkt);
+    pkt_del(ans);
+    return AOK;
+}
+
+int receiver_agent(int sock){
     bool finished = false;
     char buff[MAX_PAYLOAD_SIZE+16];
     struct pollfd poll_fd[1];
@@ -60,17 +162,19 @@ int receiver_agent(int sock){//TODO add int sock as param
             if(pkt_decode(buff, read_len, pkt) != PKT_OK){
                 fprintf(stderr, "Packet ignored, decode error");
                 pkt_del(pkt);
-                /// IGNORE
+                /// IGNORE packet
             }else{
                 fprintf(stderr, "PKT_OK -> %d\n", pkt_get_seqnum(pkt));
-                finished = true;
-                //TODO ACK and NACK
-                pkt_t* ans = pkt_new();
-                pkt_set_ack(ans, pkt);
-                fprintf(stderr, "send: %d\n", pkt_send(sock, ans));
-                fprintf(stderr, "ok\n");
-                //pkt_del(pkt);
-                //pkt_del(ans);
+                /// ACK and NACK
+                SYM flag = answer(sock, pkt);
+                if(flag == IGN){
+                    fprintf(stderr, "Packet %d ignored", pkt_get_seqnum(pkt));
+                    pkt_del(pkt);
+                }else if(flag == END){
+                    fprintf(stderr, "Packet %d reached end", pkt_get_seqnum(pkt));
+                    pkt_del(pkt);
+                    finished = true;
+                }
             }
         }
     }
@@ -119,7 +223,7 @@ int main(int argc, char **argv) {
     DEBUG("You can only see me if %s", "you built me using `make debug`");
     ERROR("This is not an error, %s", "now let's code!");
 
-    // TODO Now let's code!
+    /// START Now let's code!
     struct sockaddr_in6 addr;
     if(real_address(listen_ip, &addr)){
         fprintf(stderr, "Host cannot be resolved.");
@@ -135,5 +239,6 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Connection lost.");
         return EXIT_FAILURE;
     }
-    return receiver_agent(sock);//TODO add sock as param
+    queue = queue_new();
+    return receiver_agent(sock);
 }

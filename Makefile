@@ -12,8 +12,8 @@ LDFLAGS +=
 # Adapt these as you want to fit with your project
 SENDER_SOURCES = $(wildcard src/sender.c src/log.c src/packet_implem.c src/create_socket.c  \
 					src/real_address.c src/queue.c)
-RECEIVER_SOURCES = $(wildcard src/receiver.c src/log.c src/packet_implem.c src/create_socket.c src/read-write_loop.c \
-                    src/wait_for_client.c src/real_address.c, src/queue.c)
+RECEIVER_SOURCES = $(wildcard src/receiver.c src/log.c src/packet_implem.c src/create_socket.c src/real_address.c \
+                    src/wait_for_client.c src/queue.c)
 
 SENDER_OBJECTS = $(SENDER_SOURCES:.c=.o)
 RECEIVER_OBJECTS = $(RECEIVER_SOURCES:.c=.o)

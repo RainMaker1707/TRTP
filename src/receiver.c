@@ -101,7 +101,7 @@ SYM answer(int sock, pkt_t* pkt){
         if(checker(pkt_get_seqnum(pkt))){
             node_t* to_push = node_new();
             to_push->pkt = pkt;
-            queue_push(queue, to_push); // TODO real ordered storage
+            queue_insert(queue, to_push);
             fprintf(stderr, "In sequence packet %d - %d\n", pkt_get_seqnum(pkt), last_seq);
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
@@ -114,12 +114,13 @@ SYM answer(int sock, pkt_t* pkt){
                     }
                     pkt_del(ans);
                     return END;
-                } else {
+                }else {
                     /// WRITE sequence payload
                     for(int _ = 0; _ < queue->size; _++){
-                        if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
+                        if(queue_get_head(queue) && pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
                             node_t* to_print = queue_pop(queue);
                             printf("%s", pkt_get_payload(to_print->pkt));
+                            pkt_del(to_print->pkt);
                             free(to_print);
                             last_seq++;
                             last_seq %= 256;
@@ -128,6 +129,7 @@ SYM answer(int sock, pkt_t* pkt){
                     }
 
                 }
+                // todo correct segfault here
                 pkt_set_ack(ans, pkt);
                 if(pkt_send(sock, ans)){
                     fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
@@ -176,13 +178,21 @@ int receiver_agent(int sock){
                     fprintf(stderr, "Packet %d ignored\n", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                 }else if(flag == END){
-                    fprintf(stderr, "Packet %d reached end", pkt_get_seqnum(pkt));
+                    fprintf(stderr, "Packet %d reached end\n", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                     finished = true;
                 }else fprintf(stderr, "Packet %d ACK\n", pkt_get_seqnum(pkt));
             }
         }
         memset(buff, 0, MAX_PAYLOAD_SIZE);
+    }
+    node_t* current = queue_get_head(queue);
+    fprintf(stderr, "Queue size at end: %d\n", queue_get_size(queue));
+    printf("\n\n%s", pkt_get_payload(current->pkt));
+    while(current !=  NULL){
+        node_t* temp = current;
+        current = current->next;
+        free(temp);
     }
     free(queue);
     return EXIT_SUCCESS;

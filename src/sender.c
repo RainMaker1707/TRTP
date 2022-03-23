@@ -113,7 +113,7 @@ int sender_agent(int sock, char* filename){
     uint8_t seq_num = 0;
     if(filename) file = fopen(filename, "r");
     fprintf(stderr, "%s\n", filename);
-    while(!finished){
+    while(!finished  || queue_get_size(queue) != 0){
         /// READ file part by part
         while(!file_red && queue->size < queue->maxSize){
             size_t red_len;
@@ -174,6 +174,13 @@ int sender_agent(int sock, char* filename){
     pkt_send(sock, pkt);
     pkt_del(pkt);
     if(filename)fclose(file);
+    node_t* current = queue_get_head(queue);
+    while(current){
+        node_t* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    free(queue);
     return EXIT_SUCCESS;
 }
 
@@ -236,6 +243,6 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, 1);
+    setup_queue(queue, MAX_WINDOW_SIZE);
     return sender_agent(sock, filename);
 }

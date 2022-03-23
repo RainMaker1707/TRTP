@@ -43,20 +43,16 @@ void queue_insert(queue_t* queue, node_t* to_insert){
         pred = current;
         current = current->next;
     }
-    printf("Insertion..\n");
     if(current && pkt_get_seqnum(current->pkt) == pkt_get_seqnum(to_insert->pkt)) return; /// Ignore packets already stored
     if(pred){
-        printf("here\n");
         pred->next = to_insert;
         to_insert->next = current;
         queue->size++;
     }else{
-        printf("there\n");
         to_insert->next = queue_get_head(queue);
         queue->head = to_insert;
         queue->size++;
     }
-    printf("Inserted..\n");
 }
 
 int queue_get_size(queue_t* queue){

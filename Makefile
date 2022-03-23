@@ -56,7 +56,7 @@ ZIP_NAME="../projet1_ALLEGAERT_LECHAT"
 zip:
 	# Generate the log file stat now. Try to keep the repository clean.
 	git log --stat > gitlog.stat
-	zip -r $(ZIP_NAME) Makefile README.md src tests rapport.pdf gitlog.stat
+	zip -r $(ZIP_NAME) Makefile README.md src tests rapport.pdf gitlog.stat scribes.txt
 	# We remove it now, but you can leave it if you want.
 	rm gitlog.stat
 

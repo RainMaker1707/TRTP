@@ -33,6 +33,7 @@ node_t* queue_get_current(queue_t* queue);
 
 void queue_push(queue_t* queue, node_t* to_push);
 node_t* queue_pop(queue_t* queue);
+void queue_insert(queue_t* queue, node_t* to_insert);
 void queue_push_pkt(queue_t* queue, pkt_t* pkt);
 
 int queue_insert_at(queue_t* queue, node_t* to_push, int index); // TODO

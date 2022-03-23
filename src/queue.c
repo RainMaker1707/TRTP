@@ -4,7 +4,7 @@
 #include "queue.h"
 
 /*
- * This file is an ADT for a pkt linked list FIFO, using two struct
+ * This file is an ADT for a pkt linked list FIFO, using two structs
  * queue_t: which is a basically a linked_list with size AND a NULL pointer at the end.
  * node_t: which is a node storing a pkt_t* and its follower node_t*
  */
@@ -16,7 +16,7 @@ queue_t* queue_new(){
     queue->maxSize = 1;
     queue->head = NULL;
     queue->tail = NULL;
-    return queue;
+    return queue; /// DO NOT FORGET  TO FREE
 }
 
 node_t* node_new(){
@@ -24,7 +24,7 @@ node_t* node_new(){
     if(!node) return NULL;
     node->pkt = NULL;
     node->next = NULL;
-    return node;
+    return node; /// DO NOT FORGET  TO FREE
 }
 
 void setup_queue(queue_t* queue, int maxSize){
@@ -35,11 +35,35 @@ void setup_node(node_t* node, pkt_t* pkt, node_t* next){
     node->next = next;
 }
 
+void queue_insert(queue_t* queue, node_t* to_insert){
+    if(queue_get_size(queue) == 0) return queue_push(queue, to_insert);
+    node_t* current = queue_get_head(queue);
+    node_t* pred = NULL;
+    while(current && pkt_get_seqnum(current->pkt) < pkt_get_seqnum(to_insert->pkt)) {
+        pred = current;
+        current = current->next;
+    }
+    printf("Insertion..\n");
+    if(current && pkt_get_seqnum(current->pkt) == pkt_get_seqnum(to_insert->pkt)) return; /// Ignore packets already stored
+    if(pred){
+        printf("here\n");
+        pred->next = to_insert;
+        to_insert->next = current;
+        queue->size++;
+    }else{
+        printf("there\n");
+        to_insert->next = queue_get_head(queue);
+        queue->head = to_insert;
+        queue->size++;
+    }
+    printf("Inserted..\n");
+}
+
 int queue_get_size(queue_t* queue){
-    return queue->size;
+    return (int)queue->size;
 }
 int queue_get_max_size(queue_t* queue){
-    return queue->maxSize;
+    return (int)queue->maxSize;
 }
 
 node_t* queue_get_head(queue_t* queue){
@@ -61,7 +85,6 @@ void queue_push(queue_t* queue, node_t* to_push){
         queue->tail->next = to_push;
         queue->tail = to_push;
         queue->size += 1;
-        fprintf(stderr, "INQUEUE");
     }
 }
 
@@ -76,19 +99,65 @@ node_t* queue_pop(queue_t* queue){
     node_t* to_return = queue->head;
     queue->head = queue->head->next;
     queue->size -= 1;
-    return to_return; // TODO NOT FORGET TO FREE NODE
+    return to_return; /// DO NOT FORGET TO FREE NODE
 }
-int queue_insert_at(queue_t* queue, node_t* to_push, int index);
-node_t* queue_remove_at(queue_t* queue, int index);
 
 /*
 int main(int argc, char* argv[]){
+    printf("Running\n");
     queue_t* queue = queue_new();
     setup_queue(queue, 10);
-    printf("queue size: %d\n", queue_get_size(queue));
-    queue_push(queue, node_new());
-    printf("queue size: %d\n", queue_get_size(queue));
-    while(queue_pop(queue)) printf("POP\n");
+
+    pkt_t* pkt = pkt_new();
+    pkt_set_seqnum(pkt, 1);
+    pkt_t* pkt2 = pkt_new();
+    pkt_set_seqnum(pkt2, 3);
+    pkt_t* pkt3 = pkt_new();
+    pkt_set_seqnum(pkt3, 0);
+    printf("pkt created\n");
+    node_t* node = node_new();
+    node_t* node2 = node_new();
+    node_t* node3 = node_new();
+    printf("node created\n");
+    setup_node(node, pkt, NULL);
+    queue_insert(queue, node);
+    printf("First insert -- qs: %d\n", queue_get_size(queue));
+    setup_node(node2, pkt2, NULL);
+    queue_insert(queue, node2);
+    printf("2nd insert -- qs: %d\n", queue_get_size(queue));
+    setup_node(node3, pkt3, NULL);
+    queue_insert(queue, node3);
+    printf("Queue Size after inserts (3) -> %d\n", queue_get_size(queue));
+    node_t* current = queue_get_head(queue);
+    while(current){
+        printf("Seq: %d\n", pkt_get_seqnum(current->pkt));
+        current = current->next;
+    }
+
+    node_t* cu = node_new();
+    pkt_t* pt = pkt_new();
+    pkt_set_seqnum(pt, 2);
+    setup_node(cu, pt, NULL);
+    queue_insert(queue, cu);
+    printf("Queue size: %d (4)\n", queue_get_size(queue));
+
+    current = queue_get_head(queue);
+    while(current){
+        printf("Seq: %d\n", pkt_get_seqnum(current->pkt));
+        current = current->next;
+    }
+
+    /// Garbage
+    pkt_del(pkt);
+    pkt_del(pkt2);
+    pkt_del(pkt3);
+    current = queue_get_head(queue);
+    while(current){
+        current=current->next;
+        free(queue_pop(queue));
+    }
+    free(queue);
     return EXIT_SUCCESS;
 }
  */
+/// gcc queue.c packet_implem.c -o test -lz && ./test

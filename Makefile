@@ -11,18 +11,26 @@ LDFLAGS +=
 
 # Adapt these as you want to fit with your project
 SENDER_SOURCES = $(wildcard src/sender.c src/log.c src/packet_implem.c src/create_socket.c  \
-					src/real_address.c src/queue.c)
+								src/real_address.c src/queue.c)
 RECEIVER_SOURCES = $(wildcard src/receiver.c src/log.c src/packet_implem.c src/create_socket.c src/real_address.c \
-                    src/wait_for_client.c src/queue.c)
+                    			src/wait_for_client.c src/queue.c)
+NEW_SENDER_S = $(wildcard src/new_sender.c src/log.c src/packet_implem.c src/create_socket.c  \
+               					src/real_address.c src/queue.c)
+NEW_RECEIVER_S = $(wildcard src/new_receiver.c src/log.c src/packet_implem.c src/create_socket.c src/real_address.c \
+                                src/wait_for_client.c src/queue.c)
 
 SENDER_OBJECTS = $(SENDER_SOURCES:.c=.o)
 RECEIVER_OBJECTS = $(RECEIVER_SOURCES:.c=.o)
+NEW_SENDER_OBJECTS = $(NEW_SENDER_S:.c=.o)
+NEW_RECEIVER_OBJECTS = $(NEW_RECEIVER_S:.c=.o)
 
 SENDER = sender
 RECEIVER = receiver
+NEW_SENDER = new_sender
+NEW_RECEIVER = new_receiver
 
 
-all: $(SENDER) $(RECEIVER)
+all: $(SENDER) $(RECEIVER) $(NEW_SENDER) $(NEW_RECEIVER)
 
 $(SENDER): $(SENDER_OBJECTS)
 	$(CC) $(SENDER_OBJECTS) -o $@ $(LDFLAGS) -lz
@@ -30,16 +38,22 @@ $(SENDER): $(SENDER_OBJECTS)
 $(RECEIVER): $(RECEIVER_OBJECTS)
 	$(CC) $(RECEIVER_OBJECTS) -o $@ $(LDFLAGS) -lz
 
+$(NEW_SENDER): $(NEW_SENDER_OBJECTS)
+	$(CC) $(NEW_SENDER_OBJECTS) -o $@ $(LDFLAGS) -lz
+
+$(NEW_RECEIVER): $(NEW_RECEIVER_OBJECTS)
+	$(CC) $(NEW_RECEIVER_OBJECTS) -o $@ $(LDFLAGS) -lz
+
 %.o: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
 .PHONY: clean mrproper
 
 clean:
-	rm -f $(SENDER_OBJECTS) $(RECEIVER_OBJECTS)
+	rm -f $(SENDER_OBJECTS) $(RECEIVER_OBJECTS) $(NEW_SENDER_OBJECTS)
 
 mrproper:
-	rm -f $(SENDER) $(RECEIVER)
+	rm -f $(SENDER) $(RECEIVER) $(NEW_SENDER) $(NEW_RECEIVER)
 
 # It is likely that you will need to update this
 tests: all
@@ -67,3 +81,11 @@ run_sender:
 run_receiver:
 	make all
 	./receiver :: 12345 2>receiver.txt
+
+sender_n:
+	make all
+	./new_sender ::1 8088 2>log.txt < scribe.txt
+
+receiver_n:
+	make all
+	./new_receiver :: 8088 2>receiver.txt

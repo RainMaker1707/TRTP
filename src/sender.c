@@ -87,7 +87,7 @@ bool ack_nack_dispatch(int sock){
             last_ack = pkt_get_seqnum(pkt);
             fprintf(stderr, "Last ack: %d\n", last_ack);
         }
-    }if(pkt_get_type(pkt) == PTYPE_NACK){
+    }else if(pkt_get_type(pkt) == PTYPE_NACK){
         /// RESEND PACKET WITH NACK
         fprintf(stderr, "NACK received\n");
         if(!checker((seq_num + 1) % 256, queue->maxSize)){
@@ -120,7 +120,7 @@ int sender_agent(int sock, char* filename){
             if(!filename && feof(stdin)) file_red = true;
             if(filename) red_len = fread(buff, sizeof(char), sizeof(buff)-1, file);
             else red_len = read(STDIN_FILENO, buff, sizeof(buff)-1); // read on stdin if no filename
-            if(!red_len) file_red = true;
+            if(red_len==0) file_red = true;
             else{
                 /// SETUP and SEND packet
                 pkt_t* pkt = pkt_new();
@@ -141,7 +141,7 @@ int sender_agent(int sock, char* filename){
             }
         }
         /// WAIT for ACK and NACK
-        int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
+        int poll_fdd = poll(poll_fd, 2, 0); // 0 == no timeout
         if(poll_fdd >= 1) ack_nack_dispatch(sock);
         /// SEND packet expired
         node_t* current = queue->head;
@@ -170,7 +170,7 @@ int sender_agent(int sock, char* filename){
     pkt_set_length(pkt, 0);
     pkt_set_seqnum(pkt, seq_num);
     pkt_set_timestamp(pkt,0);
-    pkt_set_payload(pkt,NULL,0);
+    pkt_set_payload(pkt,"",0);
     pkt_send(sock, pkt);
     pkt_del(pkt);
     if(filename)fclose(file);

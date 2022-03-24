@@ -52,13 +52,6 @@ int print_usage(char *prog_name) {
     return EXIT_FAILURE;
 }
 
-bool checker(uint8_t seq){
-    /// Check if seqnum is in sequence
-    if(seq == last_seq) return false;
-    if(seq > last_seq || seq <= (last_seq + window_size)%256) return true;
-    return false;
-}
-
 bool pkt_send(int sock, pkt_t* pkt){
     /// SEND packet
     size_t len = 10;
@@ -67,6 +60,13 @@ bool pkt_send(int sock, pkt_t* pkt){
     ssize_t error = write(sock, buff, len);  // SEND PACKET
     if(error < 0) return false;
     return true;
+}
+
+bool checker(uint8_t seq){
+    /// Check if seqnum is in sequence
+    if(seq == last_seq) return false;
+    if(seq > last_seq || seq <= (last_seq + window_size)%256) return true;
+    return false;
 }
 
 SYM answer(int sock, pkt_t* pkt){
@@ -106,6 +106,7 @@ SYM answer(int sock, pkt_t* pkt){
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
                     /// LAST ACK
+                    printf("\n\n$$$$$$$$$\n\n$%s", pkt_get_payload(pkt));
                     fprintf(stderr, "EOF ACK setup...\n");
                     pkt_set_ack(ans, pkt);
                     fprintf(stderr, "EOF ACK set...\n");
@@ -154,11 +155,11 @@ SYM answer(int sock, pkt_t* pkt){
 int receiver_agent(int sock){
     bool finished = false;
     char buff[MAX_PAYLOAD_SIZE+16];
-    struct pollfd poll_fd[1];
+    struct pollfd poll_fd[2];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     while(!finished){
-        int poll_fdd = poll(poll_fd, 1, 5000);
+        int poll_fdd = poll(poll_fd, 1, 2000);
         if(poll_fdd == 0) {
             fprintf(stderr, "ERROR poll\n");
             return EXIT_FAILURE;

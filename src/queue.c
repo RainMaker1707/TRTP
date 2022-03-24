@@ -55,6 +55,12 @@ void queue_insert(queue_t* queue, node_t* to_insert){
     }
 }
 
+void queue_insert_pkt(queue_t* queue, pkt_t* pkt){
+    node_t* node = node_new();
+    setup_node(node, pkt, NULL);
+    queue_insert(queue, node);
+}
+
 int queue_get_size(queue_t* queue){
     return (int)queue->size;
 }

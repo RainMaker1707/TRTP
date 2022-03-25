@@ -76,16 +76,15 @@ zip:
 
 run_sender:
 	make all
-	./sender ::1 12345 2>log.txt < scribe.txt
+	./sender ::1 12345 2>sender.log < scribe.txt
 
 run_receiver:
 	make all
-	./receiver :: 12345 2>receiver.txt
-
+	./receiver :: 12345 2>receiver.log
 sender_n:
 	make all
-	./new_sender ::1 8088 2>log.txt < scribe.txt
+	./new_sender  -s stats.csv ::1 8088 2>sender.log < scribe.txt
 
 receiver_n:
 	make all
-	./new_receiver :: 8088 2>receiver.txt
+	./new_receiver -s stats.csv :: 8088 1>out.txt  2>receiver.log

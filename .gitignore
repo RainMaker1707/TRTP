@@ -3,30 +3,16 @@
 
 .idea/
 
-test_file.txt
-
-log.txt
-
 sender
-
-log_f.txt
-
-receive.txt
-
-receiver.txt
-
 receiver
-
 projet1_allegaert_lechat.zip
-
 gitlog.stat
 
 input_file
 
 sender.log
-
-src/test
+receiver.log
+out.txt
 
 new_sender
-
 new_receiver

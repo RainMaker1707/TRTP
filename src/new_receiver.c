@@ -277,6 +277,22 @@ int main(int argc, char **argv) {
     queue = queue_new();
     setup_queue(queue, window_size);
     receiver_agent(sock);
-    // TODO print statistics
+    /// Print statistics
+    FILE* stat_file;
+    if(stats_filename) stat_file = fopen(stats_filename, "w");
+    else stat_file = stderr;
+    fprintf(stat_file, "data_sent: %d\n", stats[0]);
+    fprintf(stat_file, "data_received: %d\n", stats[1]);
+    fprintf(stat_file, "data_truncated: %d\n", stats[2]);
+    fprintf(stat_file, "fec_sent: %d\n", stats[3]);
+    fprintf(stat_file, "fec_received: %d\n", stats[4]);
+    fprintf(stat_file, "ack_sent: %d\n", stats[5]);
+    fprintf(stat_file, "ack_received: %d\n", stats[6]);
+    fprintf(stat_file, "nack_sent: %d\n", stats[7]);
+    fprintf(stat_file, "nack_received: %d\n", stats[8]);
+    fprintf(stat_file, "packet_ignored: %d\n", stats[9]);
+    fprintf(stat_file, "packet_duplicated: %d\n", stats[10]);
+    fprintf(stat_file, "packet_recovered: %d\n", stats[11]);
+    if(stats_filename) fclose(stat_file);
     return EXIT_SUCCESS;
 }

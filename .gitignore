@@ -26,3 +26,7 @@ input_file
 sender.log
 
 src/test
+
+new_sender
+
+new_receiver

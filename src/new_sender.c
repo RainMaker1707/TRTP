@@ -74,20 +74,32 @@ void ack_nack_dispatch(int sock){
         fprintf(stderr, "Packet ignored, len: %ld\n", len);
         stats[9]++; /// STAT: packet ignored
         pkt_del(pkt);
-    }else if(pkt_get_type(pkt) != PTYPE_ACK || pkt_get_type(pkt) != PTYPE_NACK){
+    }else if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
         if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt)==0) stats[1]++; /// STAT: data received
         if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt)==1) stats[2]++; /// STAT: truncated data received
         if(pkt_get_type(pkt) == PTYPE_FEC) stats[4]++; /// STAT: fec received
         pkt_del(pkt);
     }else{
-        /// TODO IT s a ACK or a NACK
+        /// IT s a ACK or a NACK
         timestamp = pkt_get_timestamp(pkt);
         if(pkt_get_type(pkt) == PTYPE_ACK){
             stats[6]++; /// STAT: ACK received
             fprintf(stderr, "ACK received -> %d\n", pkt_get_seqnum(pkt));
+            /// Delete useless packet in queue
+            node_t* current = queue_get_head(queue);
+            while(current){
+                if(pkt_get_seqnum(current->pkt) < pkt_get_seqnum(pkt)){
+                    node_t* to_free = queue_pop(queue);
+                    current = queue_get_head(queue);
+                    pkt_del(to_free->pkt);
+                    free(to_free);
+                }else break;
+            }
+            fprintf(stderr, "Queue size after ACK %d -> %d\n", pkt_get_seqnum(pkt), queue_get_size(queue));
         }else{
             stats[8]++; /// STAT: NACK received
             fprintf(stderr, "NACK received -> %d\n", pkt_get_seqnum(pkt));
+            // TODO retransmit packet
         }
     }
 }
@@ -106,8 +118,8 @@ void sender_agent(int sock, char* filename){
     while(!finish){
         while(!file_red && queue_get_size(queue) < queue_get_max_size(queue)){
             size_t red_len;
-            if(filename) red_len = fread(buff, sizeof(char), sizeof(buff)-1, file);
-            else red_len = read(STDIN_FILENO, buff, sizeof(buff)-1); // read on stdin if no filename
+            if(filename) red_len = fread(buff, sizeof(char), sizeof(buff), file);
+            else red_len = read(STDIN_FILENO, buff, sizeof(buff)); // read on stdin if no filename
             if(red_len == 0 || feof(stdin)) file_red = true;
             else{
                 pkt_t* pkt = pkt_new();
@@ -125,13 +137,8 @@ void sender_agent(int sock, char* filename){
             /// Handle ACK and NACK
             int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
             if(poll_fdd >= 1){
-                if(poll_fd[0].revents == POLLIN){
-                    ack_nack_dispatch(sock);
-                }
-                if(poll_fd[1].revents == POLLIN) {
-                    fprintf(stderr, "POLL: %d\n", poll_fdd);
-                    ack_nack_dispatch(sock);
-                }
+                fprintf(stderr, "POLL: %d\n", poll_fdd);
+                ack_nack_dispatch(sock);
             }
             /// Resent TO packets
             node_t* current = queue_get_head(queue);

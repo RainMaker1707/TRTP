@@ -53,30 +53,51 @@ int print_usage(char *prog_name) {
 bool pkt_send(int sock, pkt_t* pkt){
     /// SEND packet
     size_t len = 10;
-    char buff[len-1];
-    if(pkt_encode(pkt, buff, &len) != PKT_OK) return false; // ERROR ON PACKET ENCODING
+    char buff[len];
+    if(pkt_encode(pkt, buff, &len) != PKT_OK) {
+        fprintf(stderr, "Error on encoding packet -> %d\n", pkt_get_seqnum(pkt));
+        return false; // ERROR ON PACKET ENCODING
+    }
     ssize_t error = write(sock, buff, len);  // SEND PACKET
-    if(error < 0) return false;
+    if(error < 0) {
+        fprintf(stderr, "Error on sending packet -> %d\n", pkt_get_seqnum(pkt));
+        return false;
+    }
     return true;
 }
 
 void receiver_agent(int sock){
     bool finish = false;
     char buff[MAX_PAYLOAD_SIZE+16];
-    struct pollfd poll_fd[2];
+    struct pollfd poll_fd[1];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     if(sock == 0) fprintf(stderr, "testing...");
     while(!finish){
-        int poll_fdd = poll(poll_fd, 1, 2000); // TODO set timeout (2000)
-        if(poll_fdd > 0 && poll_fd[0].revents == POLLIN){
-            ssize_t red_len = read(sock, buff, MAX_PAYLOAD_SIZE+16);
-            pkt_t* pkt = pkt_new();
-            if(pkt_decode(buff, red_len, pkt) == PKT_OK){
-                if(pkt_get_length(pkt) > 0) fprintf(stderr, "%s", pkt_get_payload(pkt)); /// TODO send ack store and/or print
-                else if(pkt_get_length(pkt) == 0) finish = true;
+        int poll_fdd = poll(poll_fd, 1, 200);
+        if(poll_fdd > 0){
+            if(poll_fd[0].revents == POLLIN){
+                fprintf(stderr, "Packet received\n");
+                ssize_t red_len = read(sock, buff, MAX_PAYLOAD_SIZE+16);
+                pkt_t* pkt = pkt_new();
+                if(red_len > 0 && pkt_decode(buff, red_len, pkt) == PKT_OK){
+                    if(pkt_get_length(pkt) > 0) {
+                        if(pkt_get_seqnum(pkt) == next_seq()){
+                            last_seq = next_seq();
+                            printf("%s", pkt_get_payload(pkt));
+                            pkt_t* ack = pkt_new();
+                            pkt_set_ack(ack, pkt);
+                            pkt_send(sock, ack);
+                            fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
+                            pkt_del(ack);
+                            pkt_del(pkt);
+                        }
+                    }
+                    else if(pkt_get_length(pkt) == 0) finish = true;
+                    memset(buff, 0, red_len);
+                }
             }
-        }
+        }else fprintf(stderr, "Error on poll %d\n", poll_fdd);
     }
 }
 

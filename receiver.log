@@ -1,3 +1,0 @@
-./receiver: illegal option -- f
-[91m[ERROR] Usage:
-	./receiver [-s stats_filename] listen_ip listen_port[0m

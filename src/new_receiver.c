@@ -82,19 +82,22 @@ bool pkt_send(int sock, pkt_t* pkt){
     return true;
 }
 
-int max(int a, int b){
-    if(a>=b)return a;
-    else return b;
+int max_255(int a){
+    if(a > 255) return 255;
+    else return a;
 }
 
 bool in_window(pkt_t* pkt){
-    if(last_seq > pkt_get_seqnum(pkt)) return false;
-    if(last_seq <= pkt_get_seqnum(pkt)) return max(256, window_size + last_seq) > pkt_get_seqnum(pkt);
+    if( last_seq+window_size < 256 && last_seq >= pkt_get_seqnum(pkt)) return false;
+    if(last_seq < pkt_get_seqnum(pkt)) return max_255(window_size + last_seq) >= pkt_get_seqnum(pkt);
     else return (window_size + last_seq) % 256 > pkt_get_seqnum(pkt);
 }
 
 void print_queue(pkt_t* pkt){
-    queue_insert_pkt(queue, pkt);
+    printf("%s", pkt_get_payload(pkt));
+    fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(pkt));
+    pkt_del(pkt);
+    last_seq = next_seq();
     node_t* current = queue_get_head(queue);
     while(current){
         if(pkt_get_seqnum(current->pkt) == next_seq()) {
@@ -108,6 +111,13 @@ void print_queue(pkt_t* pkt){
         }
         else break;
     }
+}
+
+bool duplicated(pkt_t* pkt){
+    if(last_seq + window_size < 256) {
+        if (pkt_get_seqnum(pkt) <= last_seq) return true;
+    }
+    return false;
 }
 
 void receiver_agent(int sock){
@@ -125,8 +135,8 @@ void receiver_agent(int sock){
                 ssize_t red_len = read(sock, buff, MAX_PAYLOAD_SIZE+16);
                 pkt_t* pkt = pkt_new();
                 if(red_len > 0 && pkt_decode(buff, red_len, pkt) == PKT_OK){
-                    if(pkt_get_type(pkt) == PTYPE_DATA) {
-                        stats[1]++;
+                    if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt) == 0) {
+                        stats[1]++; /// STAT: data packet received
                         if (pkt_get_length(pkt) > 0) {
                             fprintf(stderr, "Processing ... \n");
                             if (in_window(pkt)) {
@@ -138,10 +148,11 @@ void receiver_agent(int sock){
                                     pkt_set_ack(ack, pkt);
                                     pkt_send(sock, ack);
                                     fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
+                                    stats[5]++; /// STAT: ACK sent
                                     pkt_del(ack);
                                 } else {
-                                    fprintf(stderr, "Not directly waited packet\n");
-                                    if(queue_insert_pkt(queue, pkt)){
+                                    fprintf(stderr, "Not directly waited packet -> %d\n", pkt_get_seqnum(pkt));
+                                    if(!duplicated(pkt) && queue_insert_pkt(queue, pkt)){
                                         pkt_t *ack = pkt_new();
                                         pkt_set_ack(ack, pkt);
                                         pkt_send(sock, ack);
@@ -151,20 +162,54 @@ void receiver_agent(int sock){
                                         fprintf(stderr, "Queue size after ack -> %d\n", queue_get_size(queue));
                                     }else {
                                         fprintf(stderr, "Duplicated packet, not add to queue\n");
+                                        pkt_del(pkt);
                                         stats[10]++; /// STAT: packet duplicated
                                         stats[9]++; /// STAT: packet ignored
                                     }
                                 }
                             } else {
-                                /// TODO prepare NACK or Ignore packet
+                                /// Not in window -> prepare ACK and Ignore packet ?
                                 fprintf(stderr, "Not in window");
-                                stats[7]++; /// STAT: NACK sent
+                                pkt_t* ack = pkt_new();
+                                pkt_set_ack(ack, pkt);
+                                pkt_send(sock, ack);
+                                pkt_del(ack);
+                                pkt_del(pkt);
+                                stats[5]++; /// STAT: ACK sent
                                 stats[9]++; /// STAT: packet ignored
                             }
                         } else if (pkt_get_length(pkt) == 0) finish = true;
+                    }else if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt) == 1){
+                        fprintf(stderr, "Truncated data packet received %d\n", pkt_get_seqnum(pkt));
+                        stats[2]++; /// STAT: data truncated received
+                        pkt_t* nack = pkt_new();
+                        pkt_set_nack(nack, pkt);
+                        pkt_send(sock, nack);
+                        pkt_del(nack);
+                        pkt_del(pkt);
+                        stats[7]++; /// STAT: NACK sent
+                        stats[9]++; /// STAT: packet ignored
+                    }else if(pkt_get_type(pkt) != PTYPE_DATA){ /// PACKETS IGNORED
+                        stats[9]++; /// STAT: packet ignored
+                        if(pkt_get_type(pkt) == PTYPE_FEC) {
+                            fprintf(stderr, "Packet FEC received -- Ignored\n");
+                            stats[4]++; /// STAT: FEC received
+                        }
+                        if(pkt_get_type(pkt) == PTYPE_ACK) {
+                            fprintf(stderr, "Packet ACK received -- Ignored\n");
+                            stats[6]++; /// STAT: ACK received
+                        }
+                        if(pkt_get_type(pkt) == PTYPE_NACK) {
+                            fprintf(stderr, "Packet NACK received -- Ignored\n");
+                            stats[8]++; /// STAT: NACK received
+                        }
+                        pkt_del(pkt);
                     }
                     memset(buff, 0, red_len);
-                }else stats[9]++; /// STAT: packet ignored
+                }else {
+                    pkt_del(pkt);
+                    stats[9]++; /// STAT: packet ignored
+                }
             }
         }
         fprintf(stderr, "\n\t******\n\n");

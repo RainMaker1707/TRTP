@@ -10,12 +10,10 @@ gitlog.stat
 
 input_file
 
-sender.log
-receiver.log
-out.txt
-
 new_sender
 new_receiver
 
-stats_rec.csv
-stats_send.csv
+*.pdf
+*.csv
+*.log
+*.txt

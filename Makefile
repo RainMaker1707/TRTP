@@ -83,8 +83,8 @@ run_receiver:
 	./receiver :: 12345 2>receiver.log
 sender_n:
 	make all
-	./new_sender  -s stats.csv ::1 8088 2>sender.log < scribe.txt
+	./new_sender  -s stats_send.csv ::1 8088 2>sender.log < scribe.txt
 
 receiver_n:
 	make all
-	./new_receiver -s stats.csv :: 8088 1>out.txt  2>receiver.log
+	./new_receiver -s stats_rec.csv :: 8088 1>out.txt  2>receiver.log

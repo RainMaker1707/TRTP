@@ -78,7 +78,7 @@ bool ack_nack_dispatch(int sock){
     if(pkt_get_type(pkt) == PTYPE_ACK){
         fprintf(stderr, "ACK received\n");
         if(checker(seq_num, MAX_WINDOW_SIZE)){
-            fprintf(stderr, "Waited ACK -- head seq %d", pkt_get_seqnum(queue->head->pkt));
+            fprintf(stderr, "Waited ACK -- head seq %d\n", pkt_get_seqnum(queue->head->pkt));
             while(queue->head != NULL && seq_num > pkt_get_seqnum(queue->head->pkt)) {
                 free(queue_pop(queue));
                 seq_num += 0; /// ONLY TO AVOID WARNING NOT UPDATED
@@ -87,7 +87,7 @@ bool ack_nack_dispatch(int sock){
             last_ack = pkt_get_seqnum(pkt);
             fprintf(stderr, "Last ack: %d\n", last_ack);
         }
-    }if(pkt_get_type(pkt) == PTYPE_NACK){
+    }else if(pkt_get_type(pkt) == PTYPE_NACK){
         /// RESEND PACKET WITH NACK
         fprintf(stderr, "NACK received\n");
         if(!checker((seq_num + 1) % 256, queue->maxSize)){
@@ -105,7 +105,7 @@ bool ack_nack_dispatch(int sock){
 
 int sender_agent(int sock, char* filename){
     bool finished = false;
-    struct pollfd poll_fd[1];
+    struct pollfd poll_fd[2];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     char buff[MAX_PAYLOAD_SIZE];
@@ -113,14 +113,14 @@ int sender_agent(int sock, char* filename){
     uint8_t seq_num = 0;
     if(filename) file = fopen(filename, "r");
     fprintf(stderr, "%s\n", filename);
-    while(!finished){
+    while(!finished  || queue_get_size(queue) != 0){
         /// READ file part by part
         while(!file_red && queue->size < queue->maxSize){
             size_t red_len;
             if(!filename && feof(stdin)) file_red = true;
             if(filename) red_len = fread(buff, sizeof(char), sizeof(buff)-1, file);
             else red_len = read(STDIN_FILENO, buff, sizeof(buff)-1); // read on stdin if no filename
-            if(!red_len) file_red = true;
+            if(red_len==0) file_red = true;
             else{
                 /// SETUP and SEND packet
                 pkt_t* pkt = pkt_new();
@@ -141,14 +141,14 @@ int sender_agent(int sock, char* filename){
             }
         }
         /// WAIT for ACK and NACK
-        int poll_fdd = poll(poll_fd, 3, 20000); // 0 == no timeout
+        int poll_fdd = poll(poll_fd, 2, 0); // 0 == no timeout
         if(poll_fdd >= 1) ack_nack_dispatch(sock);
         /// SEND packet expired
         node_t* current = queue->head;
         while(current != NULL){
-            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 4000) {
+            if(get_timestamp() - pkt_get_timestamp(current->pkt) > 5000) {
                 pkt_send(sock, current->pkt);
-                fprintf(stderr, "Resent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
+                fprintf(stderr, "\nResent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
             }
             current = current->next;
         }
@@ -160,7 +160,6 @@ int sender_agent(int sock, char* filename){
             }
             finished = true;
         }
-        usleep(500);
     }
     /// FINAL SEND
     fprintf(stderr, "Send final packet EOF reached with seq: %d\n", last_ack);
@@ -169,13 +168,20 @@ int sender_agent(int sock, char* filename){
     pkt_set_tr(pkt, 0);
     pkt_set_window(pkt, 0);
     pkt_set_length(pkt, 0);
-    pkt_set_seqnum(pkt, seq_num+1);
+    pkt_set_seqnum(pkt, seq_num);
     pkt_set_timestamp(pkt,0);
-    pkt_set_payload(pkt,NULL,0);
+    pkt_set_payload(pkt,"",0);
     pkt_send(sock, pkt);
     pkt_del(pkt);
     if(filename)fclose(file);
-    return 1;
+    node_t* current = queue_get_head(queue);
+    while(current){
+        node_t* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    free(queue);
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
@@ -189,19 +195,19 @@ int main(int argc, char **argv) {
     uint16_t receiver_port;
     while ((opt = getopt(argc, argv, "f:s:hc")) != -1) {
         switch (opt) {
-        case 'f':
-            filename = optarg;
-            break;
-        case 'h':
-            return print_usage(argv[0]);
-        case 's':
-            stats_filename = optarg;
-            break;
-	case 'c':
-	    fec_enabled = true;
-	    break;
-        default:
-            return print_usage(argv[0]);
+            case 'f':
+                filename = optarg;
+                break;
+            case 'h':
+                return print_usage(argv[0]);
+            case 's':
+                stats_filename = optarg;
+                break;
+            case 'c':
+                fec_enabled = true;
+                break;
+            default:
+                return print_usage(argv[0]);
         }
     }
 
@@ -222,7 +228,7 @@ int main(int argc, char **argv) {
 
     // This is not an error per-se.
     ERROR("Sender has following arguments: filename is %s, stats_filename is %s, fec_enabled is %d, receiver_ip is %s, receiver_port is %u",
-        filename, stats_filename, fec_enabled, receiver_ip, receiver_port);
+          filename, stats_filename, fec_enabled, receiver_ip, receiver_port);
 
     DEBUG("You can only see me if %s", "you built me using `make debug`");
     ERROR("This is not an error, %s", "now let's code!");
@@ -237,6 +243,6 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, 5);
+    setup_queue(queue, MAX_WINDOW_SIZE);
     return sender_agent(sock, filename);
 }

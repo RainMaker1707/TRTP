@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -5,7 +6,6 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <stdbool.h>
-#include <sys/time.h>
 #include <string.h>
 
 #include "log.h"
@@ -14,7 +14,6 @@
 #include "packet_interface.h"
 #include "wait_for_client.h"
 #include "queue.h"
-
 // TODO statistics
 
 int window_size = 1;
@@ -27,7 +26,7 @@ typedef enum {
     AOK = 0, /// All ok
     IGN = 1, /// Ignored
     END = 2, /// Reached EOF
-    ERR = 3, /// Other error
+    //ERR = 3, /// Other error
 }SYM;
 
 void pkt_set_ack_nack(pkt_t* ans, pkt_t* pkt){
@@ -53,21 +52,21 @@ int print_usage(char *prog_name) {
     return EXIT_FAILURE;
 }
 
+bool pkt_send(int sock, pkt_t* pkt){
+    /// SEND packet
+    size_t len = 10;
+    char buff[len-1];
+    if(pkt_encode(pkt, buff, &len) != PKT_OK) return false; // ERROR ON PACKET ENCODING
+    ssize_t error = write(sock, buff, len);  // SEND PACKET
+    if(error < 0) return false;
+    return true;
+}
+
 bool checker(uint8_t seq){
     /// Check if seqnum is in sequence
     if(seq == last_seq) return false;
     if(seq > last_seq || seq <= (last_seq + window_size)%256) return true;
     return false;
-}
-
-bool pkt_send(int sock, pkt_t* pkt){
-    /// SEND packet
-    size_t len = 10;
-    char buff[len];
-    if(pkt_encode(pkt, buff, &len) != PKT_OK) return false; // ERROR ON PACKET ENCODING
-    ssize_t error = write(sock, buff, len);  // SEND PACKET
-    if(error < 0) return false;
-    return true;
 }
 
 SYM answer(int sock, pkt_t* pkt){
@@ -83,6 +82,7 @@ SYM answer(int sock, pkt_t* pkt){
     timestamp = pkt_get_timestamp(pkt);
     pkt_t* ans = pkt_new();
     fprintf(stderr, "Answering...\n");
+    fprintf(stderr, "pkt len = %d\n", pkt_get_length(pkt));
     if(pkt_get_tr(pkt)){ /// TRUNCATED PACKET
         if(checker(pkt_get_seqnum(pkt))){
             /// NEED TO NACK
@@ -101,30 +101,36 @@ SYM answer(int sock, pkt_t* pkt){
         if(checker(pkt_get_seqnum(pkt))){
             node_t* to_push = node_new();
             to_push->pkt = pkt;
-            queue_push(queue, to_push); // TODO real ordered storage
+            queue_insert(queue, to_push);
+            fprintf(stderr, "In sequence packet %d - %d\n", pkt_get_seqnum(pkt), last_seq);
             if(pkt_get_seqnum(pkt) == next_seq()) {
                 if (pkt_get_length(pkt) == 0) {
                     /// LAST ACK
+                    printf("\n\n$$$$$$$$$\n\n$%s", pkt_get_payload(pkt));
                     fprintf(stderr, "EOF ACK setup...\n");
                     pkt_set_ack(ans, pkt);
+                    fprintf(stderr, "EOF ACK set...\n");
                     if (pkt_send(sock, ans)) {
                         fprintf(stderr, "EOF ACK send with seq: %d\n", pkt_get_seqnum(ans));
                     }
                     pkt_del(ans);
                     return END;
-                } else {
+                }else {
                     /// WRITE sequence payload
-                   for(int _ = 0; _ < queue->size; _++){
-                        if(pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
+                    for(int _ = 0; _ < queue->size; _++){
+                        if(queue_get_head(queue) && pkt_get_seqnum(queue_get_head(queue)->pkt) == next_seq()){
                             node_t* to_print = queue_pop(queue);
                             printf("%s", pkt_get_payload(to_print->pkt));
+                            pkt_del(to_print->pkt);
                             free(to_print);
                             last_seq++;
                             last_seq %= 256;
                             fprintf(stderr, "print payload seq %d\n", last_seq);
                         }else break;
                     }
+
                 }
+                // todo correct segfault here
                 pkt_set_ack(ans, pkt);
                 if(pkt_send(sock, ans)){
                     fprintf(stderr, "ACK sent with seq: %d\n", pkt_get_seqnum(ans));
@@ -149,11 +155,11 @@ SYM answer(int sock, pkt_t* pkt){
 int receiver_agent(int sock){
     bool finished = false;
     char buff[MAX_PAYLOAD_SIZE+16];
-    struct pollfd poll_fd[1];
+    struct pollfd poll_fd[2];
     poll_fd[0].fd = sock;
     poll_fd[0].events = POLLIN;
     while(!finished){
-        int poll_fdd = poll(poll_fd, 1, 5000);
+        int poll_fdd = poll(poll_fd, 1, 2000);
         if(poll_fdd == 0) {
             fprintf(stderr, "ERROR poll\n");
             return EXIT_FAILURE;
@@ -173,13 +179,21 @@ int receiver_agent(int sock){
                     fprintf(stderr, "Packet %d ignored\n", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                 }else if(flag == END){
-                    fprintf(stderr, "Packet %d reached end", pkt_get_seqnum(pkt));
+                    fprintf(stderr, "Packet %d reached end\n", pkt_get_seqnum(pkt));
                     pkt_del(pkt);
                     finished = true;
-                }else fprintf(stderr, "Packer %d ACK", pkt_get_seqnum(pkt));
+                }else fprintf(stderr, "Packet %d ACK\n", pkt_get_seqnum(pkt));
             }
         }
         memset(buff, 0, MAX_PAYLOAD_SIZE);
+    }
+    node_t* current = queue_get_head(queue);
+    fprintf(stderr, "Queue size at end: %d\n", queue_get_size(queue));
+    printf("\n\n%s", pkt_get_payload(current->pkt));
+    while(current !=  NULL){
+        node_t* temp = current;
+        current = current->next;
+        free(temp);
     }
     free(queue);
     return EXIT_SUCCESS;
@@ -194,13 +208,13 @@ int main(int argc, char **argv) {
 
     while ((opt = getopt(argc, argv, "s:h")) != -1) {
         switch (opt) {
-        case 'h':
-            return print_usage(argv[0]);
-        case 's':
-            stats_filename = optarg;
-            break;
-        default:
-            return print_usage(argv[0]);
+            case 'h':
+                return print_usage(argv[0]);
+            case 's':
+                stats_filename = optarg;
+                break;
+            default:
+                return print_usage(argv[0]);
         }
     }
 
@@ -221,7 +235,7 @@ int main(int argc, char **argv) {
 
     // This is not an error per-se.
     ERROR("Receiver has following arguments: stats_filename is %s, listen_ip is %s, listen_port is %u",
-        stats_filename, listen_ip, listen_port);
+          stats_filename, listen_ip, listen_port);
 
     DEBUG("You can only see me if %s", "you built me using `make debug`");
     ERROR("This is not an error, %s", "now let's code!");

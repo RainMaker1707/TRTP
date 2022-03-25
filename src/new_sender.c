@@ -158,7 +158,7 @@ void sender_agent(int sock, char* filename){
                     free(garbage);
                 }
                 free(queue);
-                fprintf(stderr, "Global TO\n");
+                fprintf(stderr, "\nGlobal TO\n");
             }
         }
     }

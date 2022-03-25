@@ -118,7 +118,7 @@ void receiver_agent(int sock){
     poll_fd[0].events = POLLIN;
     if(sock == 0) fprintf(stderr, "testing...");
     while(!finish){
-        int poll_fdd = poll(poll_fd, 1, 200);
+        int poll_fdd = poll(poll_fd, 1, 2000);
         if(poll_fdd > 0){
             if(poll_fd[0].revents == POLLIN){
                 fprintf(stderr, "Packet received\n");
@@ -140,7 +140,7 @@ void receiver_agent(int sock){
                                     fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
                                     pkt_del(ack);
                                 } else {
-                                    fprintf(stderr, "Not directly waited");
+                                    fprintf(stderr, "Not directly waited packet\n");
                                     if(queue_insert_pkt(queue, pkt)){
                                         pkt_t *ack = pkt_new();
                                         pkt_set_ack(ack, pkt);
@@ -167,6 +167,7 @@ void receiver_agent(int sock){
                 }else stats[9]++; /// STAT: packet ignored
             }
         }
+        fprintf(stderr, "\n\t******\n\n");
     }
     fprintf(stderr, "Final packet received correctly\n");
 }

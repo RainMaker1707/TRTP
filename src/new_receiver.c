@@ -94,12 +94,14 @@ bool in_window(pkt_t* pkt){
 }
 
 void print_queue(pkt_t* pkt){
+    queue_insert_pkt(queue, pkt);
     node_t* current = queue_get_head(queue);
     while(current){
-        if(pkt_get_seqnum(current->pkt) < pkt_get_seqnum(pkt)) {
+        if(pkt_get_seqnum(current->pkt) == next_seq()) {
             current = current->next;
             node_t* to_free = queue_pop(queue);
             printf("%s", pkt_get_payload(to_free->pkt));
+            fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(to_free->pkt));
             pkt_del(to_free->pkt);
             free(to_free);
             last_seq = next_seq();
@@ -127,31 +129,31 @@ void receiver_agent(int sock){
                         stats[1]++;
                         if (pkt_get_length(pkt) > 0) {
                             fprintf(stderr, "Processing ... \n");
-                            // TODO check if we already have the packet in the buffer  && do stats[10]++;
                             if (in_window(pkt)) {
                                 fprintf(stderr, "In window! Answering ... \n");
                                 if (pkt_get_seqnum(pkt) == next_seq()) { /// We wait for this packet
                                     setup_queue(queue, ++window_size);
-                                    last_seq = next_seq();
                                     print_queue(pkt);
-                                    printf("%s", pkt_get_payload(pkt));
                                     pkt_t *ack = pkt_new();
                                     pkt_set_ack(ack, pkt);
                                     pkt_send(sock, ack);
                                     fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
                                     pkt_del(ack);
-                                    pkt_del(pkt);
                                 } else {
-                                    /// Insert into queue
                                     fprintf(stderr, "Not directly waited");
-                                    queue_insert_pkt(queue, pkt);
-                                    pkt_t *ack = pkt_new();
-                                    pkt_set_ack(ack, pkt);
-                                    pkt_send(sock, ack);
-                                    fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
-                                    stats[5]++; /// STAT: ACK sent
-                                    pkt_del(ack);
-                                    fprintf(stderr, "Queue size after ack -> %d\n", queue_get_size(queue));
+                                    if(queue_insert_pkt(queue, pkt)){
+                                        pkt_t *ack = pkt_new();
+                                        pkt_set_ack(ack, pkt);
+                                        pkt_send(sock, ack);
+                                        fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
+                                        stats[5]++; /// STAT: ACK sent
+                                        pkt_del(ack);
+                                        fprintf(stderr, "Queue size after ack -> %d\n", queue_get_size(queue));
+                                    }else {
+                                        fprintf(stderr, "Duplicated packet, not add to queue\n");
+                                        stats[10]++; /// STAT: packet duplicated
+                                        stats[9]++; /// STAT: packet ignored
+                                    }
                                 }
                             } else {
                                 /// TODO prepare NACK or Ignore packet

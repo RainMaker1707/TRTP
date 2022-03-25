@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <stdio.h>
+#include <stdbool.h>
 
 #include "queue.h"
 
@@ -35,7 +35,7 @@ void setup_node(node_t* node, pkt_t* pkt, node_t* next){
     node->next = next;
 }
 
-void queue_insert(queue_t* queue, node_t* to_insert){
+bool queue_insert(queue_t* queue, node_t* to_insert){
     if(queue_get_size(queue) == 0) return queue_push(queue, to_insert);
     node_t* current = queue_get_head(queue);
     node_t* pred = NULL;
@@ -43,7 +43,7 @@ void queue_insert(queue_t* queue, node_t* to_insert){
         pred = current;
         current = current->next;
     }
-    if(current && pkt_get_seqnum(current->pkt) == pkt_get_seqnum(to_insert->pkt)) return; /// Ignore packets already stored
+    if(current && pkt_get_seqnum(current->pkt) == pkt_get_seqnum(to_insert->pkt)) return false; /// Ignore packets already stored
     if(pred){
         pred->next = to_insert;
         to_insert->next = current;
@@ -53,12 +53,13 @@ void queue_insert(queue_t* queue, node_t* to_insert){
         queue->head = to_insert;
         queue->size++;
     }
+    return true;
 }
 
-void queue_insert_pkt(queue_t* queue, pkt_t* pkt){
+bool queue_insert_pkt(queue_t* queue, pkt_t* pkt){
     node_t* node = node_new();
     setup_node(node, pkt, NULL);
-    queue_insert(queue, node);
+    return queue_insert(queue, node);
 }
 
 int queue_get_size(queue_t* queue){
@@ -75,9 +76,9 @@ node_t* queue_get_tail(queue_t* queue){
     return queue->tail;
 }
 
-void queue_push(queue_t* queue, node_t* to_push){
-    if(!queue || !to_push) return;
-    if(queue->size == queue->maxSize) return;
+bool queue_push(queue_t* queue, node_t* to_push){
+    if(!queue || !to_push) return false;
+    if(queue->size == queue->maxSize) return false;
     if(queue->size == 0){
         queue->head = to_push;
         queue->tail = to_push;
@@ -88,6 +89,7 @@ void queue_push(queue_t* queue, node_t* to_push){
         queue->tail = to_push;
         queue->size += 1;
     }
+    return true;
 }
 
 void queue_push_pkt(queue_t* queue, pkt_t* pkt){

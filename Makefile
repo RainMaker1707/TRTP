@@ -30,7 +30,7 @@ NEW_SENDER = new_sender
 NEW_RECEIVER = new_receiver
 
 
-all: $(SENDER) $(RECEIVER) $(NEW_SENDER) $(NEW_RECEIVER)
+all: $(SENDER) $(RECEIVER)
 
 $(SENDER): $(SENDER_OBJECTS)
 	$(CC) $(SENDER_OBJECTS) -o $@ $(LDFLAGS) -lz
@@ -50,7 +50,7 @@ $(NEW_RECEIVER): $(NEW_RECEIVER_OBJECTS)
 .PHONY: clean mrproper
 
 clean:
-	rm -f $(SENDER_OBJECTS) $(RECEIVER_OBJECTS) $(NEW_SENDER_OBJECTS)
+	rm -f $(SENDER_OBJECTS) $(RECEIVER_OBJECTS) $(NEW_SENDER_OBJECTS) $(NEW_RECEIVER_OBJECTS)
 
 mrproper:
 	rm -f $(SENDER) $(RECEIVER) $(NEW_SENDER) $(NEW_RECEIVER)
@@ -76,15 +76,22 @@ zip:
 
 run_sender:
 	make all
-	./sender ::1 12345 2>sender.log < scribe.txt
+	./sender ::1 8080 2>sender.log < scribe.txt
 
 run_receiver:
 	make all
-	./receiver :: 12345 2>receiver.log
+	./receiver :: 8080 2>receiver.log
+
+IN=scribe.txt
+FILE=-f $(IN)
+sender_o:
+	make all
+	./sender $(FILE) -s stats_send.csv ::1 8088 2>sender.log
 sender_n:
 	make all
-	./new_sender  -s stats_send.csv ::1 8088 2>sender.log < scribe.txt
+	./sender -s stats_send.csv ::1 8088 2>sender.log < $(IN)
 
+OUT=out.txt
 receiver_n:
 	make all
-	./new_receiver -s stats_rec.csv :: 8088 1>out.txt  2>receiver.log
+	./receiver -s stats_rec.csv :: 8088 1>$(OUT)  2>receiver.log

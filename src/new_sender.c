@@ -128,7 +128,7 @@ void sender_agent(int sock, char* filename){
                 pkt_t* pkt = pkt_new();
                 pkt_set_data(pkt, red_len, seq_num, buff);
                 queue_push_pkt(queue, pkt);
-                if(pkt_get_seqnum(pkt)==3) pkt_set_tr(pkt, 1);
+                //if(pkt_get_seqnum(pkt)==3) pkt_set_tr(pkt, 1);
                 pkt_send(sock, pkt);
                 fprintf(stderr, "Send packet -> %d\n", pkt_get_seqnum(pkt));
                 stats[0]++; /// STAT: packet sent
@@ -146,7 +146,7 @@ void sender_agent(int sock, char* filename){
             while(current){
                 // Resent after 5s without ACK
                 if(get_timestamp() - pkt_get_timestamp(current->pkt) >= 5000) {
-                    if(pkt_get_seqnum(current->pkt)==3) pkt_set_tr(current->pkt, 0);
+                    //if(pkt_get_seqnum(current->pkt)==3) pkt_set_tr(current->pkt, 0);
                     pkt_send(sock, current->pkt);
                     fprintf(stderr, "Resent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
                     stats[12]++; /// STAT: packet retransmitted

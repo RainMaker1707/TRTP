@@ -16,3 +16,6 @@ out.txt
 
 new_sender
 new_receiver
+
+stats_rec.csv
+stats_send.csv

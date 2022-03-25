@@ -29,7 +29,9 @@ typedef enum {
 
 void pkt_set_ack_nack(pkt_t* ans, pkt_t* pkt){
     pkt_set_tr(ans, 0);
+    pkt_set_payload(ans, "", 0);
     pkt_set_window(ans, window_size);
+    pkt_set_length(ans, 0);
     pkt_set_timestamp(ans, pkt_get_timestamp(pkt));
 }
 
@@ -66,6 +68,17 @@ bool pkt_send(int sock, pkt_t* pkt){
     return true;
 }
 
+int max(int a, int b){
+    if(a>=b)return a;
+    else return b;
+}
+
+bool in_window(pkt_t* pkt){
+    if(last_seq > pkt_get_seqnum(pkt)) return false;
+    if(last_seq <= pkt_get_seqnum(pkt)) return max(256, window_size + last_seq) > pkt_get_seqnum(pkt);
+    else return (window_size + last_seq) % 256 > pkt_get_seqnum(pkt);
+}
+
 void receiver_agent(int sock){
     bool finish = false;
     char buff[MAX_PAYLOAD_SIZE+16];
@@ -82,22 +95,40 @@ void receiver_agent(int sock){
                 pkt_t* pkt = pkt_new();
                 if(red_len > 0 && pkt_decode(buff, red_len, pkt) == PKT_OK){
                     if(pkt_get_length(pkt) > 0) {
-                        if(pkt_get_seqnum(pkt) == next_seq()){
-                            last_seq = next_seq();
-                            printf("%s", pkt_get_payload(pkt));
-                            pkt_t* ack = pkt_new();
-                            pkt_set_ack(ack, pkt);
-                            pkt_send(sock, ack);
-                            fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
-                            pkt_del(ack);
-                            pkt_del(pkt);
+                        fprintf(stderr, "Processing ... \n");
+                        if(in_window(pkt)) {
+                            fprintf(stderr, "In window! Answering ... \n");
+                            if (pkt_get_seqnum(pkt) == next_seq()) { /// We wait for this packet
+                                setup_queue(queue, ++window_size);
+                                last_seq = next_seq();
+                                printf("%s", pkt_get_payload(pkt));
+                                pkt_t *ack = pkt_new();
+                                pkt_set_ack(ack, pkt);
+                                pkt_send(sock, ack);
+                                fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
+                                pkt_del(ack);
+                                pkt_del(pkt);
+                            } else {
+                                /// TODO insert into queue
+                                fprintf(stderr, "Not directly waited");
+                                queue_insert_pkt(queue, pkt);
+                                pkt_t *ack = pkt_new();
+                                pkt_set_ack(ack, pkt);
+                                pkt_send(sock, ack);
+                                fprintf(stderr, "ACK sent -> %d\n", pkt_get_seqnum(ack));
+                                pkt_del(ack);
+                                fprintf(stderr, "Queue size after ack -> %d\n", queue_get_size(queue));
+                            }
+                        }else{
+                            /// TODO prepare NACK or Ignore packet
+                            fprintf(stderr, "Not in window");
                         }
                     }
                     else if(pkt_get_length(pkt) == 0) finish = true;
                     memset(buff, 0, red_len);
                 }
             }
-        }else fprintf(stderr, "Error on poll %d\n", poll_fdd);
+        }
     }
 }
 
@@ -159,6 +190,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     queue = queue_new();
+    setup_queue(queue, window_size);
     receiver_agent(sock);
     // TODO print statistics
     return EXIT_SUCCESS;

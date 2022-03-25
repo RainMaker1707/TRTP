@@ -73,12 +73,10 @@ void ack_nack_dispatch(int sock){
     if(len < 0 || pkt_decode(buff, len, pkt) !=  PKT_OK) {
         fprintf(stderr, "Packet ignored, len: %ld\n", len);
         stats[9]++; /// STAT: packet ignored
-        pkt_del(pkt);
     }else if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
         if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt)==0) stats[1]++; /// STAT: data received
         if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt)==1) stats[2]++; /// STAT: truncated data received
         if(pkt_get_type(pkt) == PTYPE_FEC) stats[4]++; /// STAT: fec received
-        pkt_del(pkt);
     }else{
         /// IT s a ACK or a NACK
         timestamp = pkt_get_timestamp(pkt);
@@ -96,12 +94,16 @@ void ack_nack_dispatch(int sock){
                 }else break;
             }
             fprintf(stderr, "Queue size after ACK %d -> %d\n", pkt_get_seqnum(pkt), queue_get_size(queue));
+            /// TODO update rtt
+            timestamp = get_timestamp();
+            setup_queue(queue, pkt_get_window(pkt));
         }else{
             stats[8]++; /// STAT: NACK received
             fprintf(stderr, "NACK received -> %d\n", pkt_get_seqnum(pkt));
             // TODO retransmit packet
         }
     }
+    pkt_del(pkt);
 }
 
 void sender_agent(int sock, char* filename){
@@ -136,17 +138,14 @@ void sender_agent(int sock, char* filename){
         else{
             /// Handle ACK and NACK
             int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
-            if(poll_fdd >= 1){
-                fprintf(stderr, "POLL: %d\n", poll_fdd);
-                ack_nack_dispatch(sock);
-            }
+            if(poll_fdd >= 1) ack_nack_dispatch(sock);
             /// Resent TO packets
             node_t* current = queue_get_head(queue);
             while(current){
                 // Resent after 5s without ACK
                 if(get_timestamp() - pkt_get_timestamp(current->pkt) >= 5000) {
                     pkt_send(sock, current->pkt);
-                    fprintf(stderr, "\nResent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
+                    fprintf(stderr, "Resent packet TO -> %d\n", pkt_get_seqnum(current->pkt));
                     stats[12]++; /// STAT: packet retransmitted
                 }
                 current = current->next;

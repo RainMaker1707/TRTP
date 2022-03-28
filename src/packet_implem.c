@@ -217,8 +217,8 @@ pkt_status_code pkt_set_crc2(pkt_t *pkt, const uint32_t crc2){
 
 
 pkt_status_code pkt_set_payload(pkt_t *pkt, const char *data, const uint16_t length){
-  pkt->payload=calloc(1, (sizeof(char*) * length));
-    if(pkt->payload== NULL) return (E_NOMEM);
+    pkt->payload = (char*)malloc(sizeof(char) * length);
+    if(pkt->payload == NULL) return (E_NOMEM);
     memcpy(pkt->payload, data, length);
     pkt_set_length(pkt, length);
     return (PKT_OK);

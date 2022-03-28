@@ -36,13 +36,6 @@ uint32_t timestamp;
 int next_seq(){return (last_seq+1)%256;} /// %256 because seq num is on 8 bits
 queue_t* queue;
 
-typedef enum {
-    AOK = 0, /// All ok
-    IGN = 1, /// Ignored
-    END = 2, /// Reached EOF
-    //ERR = 3, /// Other error
-}SYM;
-
 void pkt_set_ack_nack(pkt_t* ans, pkt_t* pkt){
     pkt_set_tr(ans, 0);
     pkt_set_payload(ans, "", 0);
@@ -96,7 +89,7 @@ bool in_window(pkt_t* pkt){
 }
 
 void print_queue(pkt_t* pkt){
-    printf("%s", pkt_get_payload(pkt));
+    fwrite(pkt_get_payload(pkt), sizeof(char), pkt_get_length(pkt), stdout);
     fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(pkt));
     pkt_del(pkt);
     last_seq = next_seq();
@@ -105,8 +98,7 @@ void print_queue(pkt_t* pkt){
         if(pkt_get_seqnum(current->pkt) == next_seq()) {
             current = current->next;
             node_t* to_free = queue_pop(queue);
-            //printf("%s", pkt_get_payload(to_free->pkt));
-            write(STDOUT_FILENO, pkt_get_payload(to_free->pkt), pkt_get_length(to_free->pkt));
+            fwrite(pkt_get_payload(to_free->pkt), sizeof(char), pkt_get_length(pkt), stdout);
             fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(to_free->pkt));
             pkt_del(to_free->pkt);
             free(to_free);
@@ -114,6 +106,7 @@ void print_queue(pkt_t* pkt){
         }
         else break;
     }
+
 }
 
 bool duplicated(pkt_t* pkt){
@@ -189,6 +182,7 @@ void receiver_agent(int sock){
                         pkt_t* nack = pkt_new();
                         pkt_set_nack(nack, pkt);
                         pkt_send(sock, nack);
+                        fprintf(stderr, "NACK sent -> %d\n", pkt_get_seqnum(nack));
                         pkt_del(nack);
                         pkt_del(pkt);
                         stats[7]++; /// STAT: NACK sent
@@ -284,6 +278,7 @@ int main(int argc, char **argv) {
     }
     queue = queue_new();
     setup_queue(queue, window_size);
+    //freopen(NULL, "wb", stdout);
     receiver_agent(sock);
     /// Print statistics
     FILE* stat_file;

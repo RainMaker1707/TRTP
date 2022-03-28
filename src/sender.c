@@ -18,7 +18,6 @@
 
 uint32_t timestamp;
 queue_t* queue;
-uint8_t last_ack = 0;
 
 // stats[0]: data_sent
 // stats[1]: data_received
@@ -33,7 +32,7 @@ uint8_t last_ack = 0;
 // stats[10]: min_rtt
 // stats[11]: max_rtt
 // stats[12]: packet_retransmitted
-uint32_t stats[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint32_t stats[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, INT32_MAX, 0, 0};
 
 int print_usage(char *prog_name) {
     ERROR("Usage:\n\t%s [-f filename] [-s stats_filename] [-c] receiver_ip receiver_port", prog_name);
@@ -96,17 +95,21 @@ void ack_nack_dispatch(int sock){
             fprintf(stderr, "Queue size after ACK %d -> %d\n", pkt_get_seqnum(pkt), queue_get_size(queue));
             /// Update rtt
             uint32_t rtt = get_timestamp() - pkt_get_timestamp(pkt);
-            if(stats[10] == 0 && stats[11] == 0){
-                stats[10] = rtt;
-                stats[11] = stats[10];
-            }else if(stats[10] > rtt) stats[10] = rtt;
-            else if(stats[11] < rtt) stats[11] = rtt;
+            if(stats[10] > rtt) stats[10] = rtt;
+            if(stats[11] < rtt) stats[11] = rtt;
             timestamp = get_timestamp();
             if(pkt_get_window(pkt) > 0) setup_queue(queue, pkt_get_window(pkt));
         }else{
             stats[8]++; /// STAT: NACK received
             fprintf(stderr, "NACK received -> %d\n", pkt_get_seqnum(pkt));
-            // TODO retransmit packet
+            /// Retransmit NACK packet
+            node_t* current = queue_get_head(queue);
+            while(current){
+                if(pkt_get_seqnum(pkt) == pkt_get_seqnum(current->pkt)){
+                    pkt_send(sock, current->pkt);
+                    break;
+                }
+            }
         }
     }
     pkt_del(pkt);
@@ -121,7 +124,7 @@ void sender_agent(int sock, char* filename){
     char buff[MAX_PAYLOAD_SIZE];
     FILE* file;
     uint8_t seq_num = 0;
-    if(filename) file = fopen(filename, "rb");
+    if(filename) file = fopen(filename, "r");
     fprintf(stderr, "%s\n", filename);
     while(!finish){
         while(!file_red && queue_get_size(queue) < queue_get_max_size(queue)){
@@ -146,7 +149,7 @@ void sender_agent(int sock, char* filename){
         if(file_red && queue_get_size(queue)==0) finish = true;
         else{
             /// Handle ACK and NACK
-            int poll_fdd = poll(poll_fd, 1, 0); // 0 == no timeout
+            int poll_fdd = poll(poll_fd, 1, 2000); // 0 == no timeout
             if(poll_fdd >= 1) ack_nack_dispatch(sock);
             /// Resent TO packets
             node_t* current = queue_get_head(queue);
@@ -253,8 +256,8 @@ int main(int argc, char **argv) {
     fprintf(stat_file, "nack_sent: %d\n", stats[7]);
     fprintf(stat_file, "nack_received: %d\n", stats[8]);
     fprintf(stat_file, "packet_ignored: %d\n", stats[9]);
-    fprintf(stat_file, "min_rtt: %d\n", stats[10]);
-    fprintf(stat_file, "max_rtt: %d\n", stats[11]);
+    fprintf(stat_file, "min_rtt: %u\n", stats[10]);
+    fprintf(stat_file, "max_rtt: %u\n", stats[11]);
     fprintf(stat_file, "packet_retransmitted: %d\n", stats[12]);
     if(stats_filename) fclose(stat_file);
     return EXIT_SUCCESS;

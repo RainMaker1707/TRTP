@@ -98,7 +98,7 @@ void print_queue(pkt_t* pkt){
         if(pkt_get_seqnum(current->pkt) == next_seq()) {
             current = current->next;
             node_t* to_free = queue_pop(queue);
-            fwrite(pkt_get_payload(to_free->pkt), sizeof(char), pkt_get_length(pkt), stdout);
+            fwrite(pkt_get_payload(to_free->pkt), sizeof(char), pkt_get_length(to_free->pkt), stdout);
             fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(to_free->pkt));
             pkt_del(to_free->pkt);
             free(to_free);
@@ -280,6 +280,7 @@ int main(int argc, char **argv) {
     setup_queue(queue, window_size);
     //freopen(NULL, "wb", stdout);
     receiver_agent(sock);
+    close(sock);
     /// Print statistics
     FILE* stat_file;
     if(stats_filename) stat_file = fopen(stats_filename, "w");

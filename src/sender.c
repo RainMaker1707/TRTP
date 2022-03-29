@@ -107,6 +107,7 @@ void ack_nack_dispatch(int sock){
             while(current){
                 if(pkt_get_seqnum(pkt) == pkt_get_seqnum(current->pkt)){
                     pkt_send(sock, current->pkt);
+                    fprintf(stderr, "Packet retransmitted -> %d\n", pkt_get_seqnum(current->pkt));
                     break;
                 }
             }
@@ -260,5 +261,6 @@ int main(int argc, char **argv) {
     fprintf(stat_file, "max_rtt: %u\n", stats[11]);
     fprintf(stat_file, "packet_retransmitted: %d\n", stats[12]);
     if(stats_filename) fclose(stat_file);
+    close(sock);
     return EXIT_SUCCESS;
 }

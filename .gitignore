@@ -17,3 +17,5 @@ new_receiver
 *.csv
 *.log
 *.txt
+
+*.jpeg

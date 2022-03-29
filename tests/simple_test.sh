@@ -14,7 +14,7 @@ if [ ! -z "$VALGRIND" ] ; then
 fi
 
 # On lance le receiver et capture sa sortie standard
-$valgrind ./receiver :: 8088  1>received_file 2>receiver.log
+$valgrind ./receiver :: 8080  1>received_file 2>receiver.log
 receiver_pid=$!
 
 cleanup()
@@ -26,7 +26,7 @@ cleanup()
 trap cleanup SIGINT  # Kill les process en arrière plan en cas de ^-C
 
 # On démarre le transfert
-if ! $valgrind ./sender ::1 8088 < input_file 2>sender.log ; then
+if ! $valgrind ./sender ::1 8080 <input_file 2>sender.log ; then
   echo "Crash du sender!"
   cat sender.log
   err=1  # On enregistre l'erreur

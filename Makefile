@@ -96,10 +96,6 @@ receiver_n:
 	make all
 	./receiver -s stats_rec.csv :: 8088 1>$(OUT)  2>receiver.log
 
-tt:
-	$(CC) test.c src/packet_implem.c -o ttt -lz
-	./ttt 1>$(OUT) <$(IN)
-
 sender_c:
 	make all
 	./sender -s stats_send.csv ::1 8088 1>in_$(IN) 2>sender.log <$(IN)

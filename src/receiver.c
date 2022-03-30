@@ -91,7 +91,7 @@ bool in_window(pkt_t* pkt){
 void print_queue(pkt_t* pkt){
     fwrite(pkt_get_payload(pkt), sizeof(char), pkt_get_length(pkt), stdout);
     fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(pkt));
-    pkt_del(pkt);
+    //pkt_del(pkt);
     fprintf(stderr, "debug one\n");
     last_seq = next_seq();
     fprintf(stderr, "debug two\n");

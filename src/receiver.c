@@ -92,8 +92,11 @@ void print_queue(pkt_t* pkt){
     fwrite(pkt_get_payload(pkt), sizeof(char), pkt_get_length(pkt), stdout);
     fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(pkt));
     pkt_del(pkt);
+    fprintf(stderr, "debug one\n");
     last_seq = next_seq();
+    fprintf(stderr, "debug two\n");
     node_t* current = queue_get_head(queue);
+    fprintf(stderr, "debug three\n");
     while(current){
         if(pkt_get_seqnum(current->pkt) == next_seq()) {
             current = current->next;

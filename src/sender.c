@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
     }
     timestamp = get_timestamp();
     queue = queue_new();
-    setup_queue(queue, MAX_WINDOW_SIZE);
+    setup_queue(queue, 1);
     sender_agent(sock, filename);
     /// Print statistics
     FILE* stat_file;

@@ -71,7 +71,7 @@ void ack_nack_dispatch(int sock){
     char buff[10];
     ssize_t len = read(sock, buff, 10);
     if(len < 0 || pkt_decode(buff, len, pkt) !=  PKT_OK) {
-        fprintf(stderr, "Packet ignored, len: %ld\n", len);
+        fprintf(stderr, "Packet ignored, len: %zd\n", len);
         stats[9]++; /// STAT: packet ignored
     }else if(pkt_get_type(pkt) != PTYPE_ACK && pkt_get_type(pkt) != PTYPE_NACK){
         if(pkt_get_type(pkt) == PTYPE_DATA && pkt_get_tr(pkt)==0) stats[1]++; /// STAT: data received

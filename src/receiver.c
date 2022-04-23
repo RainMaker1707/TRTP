@@ -92,7 +92,6 @@ void print_queue(pkt_t* pkt){
     fwrite(pkt_get_payload(pkt), sizeof(char), pkt_get_length(pkt), stdout);
     fprintf(stderr, "Printed packet %d payload\n", pkt_get_seqnum(pkt));
     pkt_del(pkt);
-    fprintf(stderr, "debug one\n");
     last_seq = next_seq();
     node_t* current = queue_get_head(queue);
     while(current){
@@ -107,7 +106,6 @@ void print_queue(pkt_t* pkt){
         }
         else break;
     }
-    fprintf(stderr, "debug two\n");
 }
 
 bool duplicated(pkt_t* pkt){

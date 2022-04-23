@@ -30,7 +30,7 @@
 // stats[11]: packet_recovered
 int stats[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-int window_size = 1;
+uint8_t window_size = 1;
 int last_seq = -1;
 uint32_t timestamp;
 int next_seq(){return (last_seq+1)%256;} /// %256 because seq num is on 8 bits
@@ -79,6 +79,11 @@ bool pkt_send(int sock, pkt_t* pkt){
 
 int max_255(int a){
     if(a > 255) return 255;
+    else return a;
+}
+uint8_t max_window(uint8_t a){
+    if(a > 31) return 31;
+    if(a < 0) return 0;
     else return a;
 }
 
@@ -138,7 +143,9 @@ void receiver_agent(int sock){
                             if (in_window(pkt)) {
                                 fprintf(stderr, "In window! Answering ... \n");
                                 if (pkt_get_seqnum(pkt) == next_seq()) { /// We wait for this packet
-                                    setup_queue(queue, ++window_size);
+                                    window_size = max_window(window_size + 1);
+                                    setup_queue(queue, window_size);
+                                    fprintf(stderr, "-----> %d\n", window_size);
                                     print_queue(pkt);
                                     pkt_t *ack = pkt_new();
                                     pkt_set_ack(ack, pkt);

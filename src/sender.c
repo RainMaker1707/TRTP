@@ -18,6 +18,7 @@
 
 uint32_t timestamp;
 queue_t* queue;
+uint8_t window_size = 1;
 
 // stats[0]: data_sent
 // stats[1]: data_received
@@ -59,7 +60,7 @@ bool pkt_send(int sock, pkt_t* pkt){
 void pkt_set_data(pkt_t* pkt, size_t red_len, uint8_t seqnum, char* buff){
     pkt_set_type(pkt, PTYPE_DATA); // SETTING TYPE ON DATA
     pkt_set_tr(pkt, 0); // NOT TRUNCATED
-    pkt_set_window(pkt, 0);  // NO WINDOW, UPDATED FROM ACK or NACK
+    pkt_set_window(pkt, window_size);  // NO WINDOW, UPDATED FROM ACK or NACK
     pkt_set_length(pkt, red_len); // LEN GET FROM fread()
     pkt_set_seqnum(pkt, seqnum); // SETTING UP SEQ_NUM
     pkt_set_timestamp(pkt, 0); // NEED TO BE UPDATED
@@ -82,7 +83,8 @@ void ack_nack_dispatch(int sock){
         timestamp = get_timestamp();
         if(pkt_get_type(pkt) == PTYPE_ACK){
             stats[6]++; /// STAT: ACK received
-            fprintf(stderr, "ACK received -> %d\n", pkt_get_seqnum(pkt));
+            window_size = pkt_get_window(pkt);
+            fprintf(stderr, "ACK received -> %d -- New Window -> %d\n", pkt_get_seqnum(pkt), window_size);
             /// Delete useless packet in queue
             node_t* current = queue_get_head(queue);
             while(current){

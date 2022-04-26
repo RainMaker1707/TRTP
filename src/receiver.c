@@ -83,7 +83,6 @@ int max_255(int a){
 }
 uint8_t max_window(uint8_t a){
     if(a > 31) return 31;
-    if(a < 0) return 0;
     else return a;
 }
 

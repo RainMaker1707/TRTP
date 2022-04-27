@@ -19,3 +19,8 @@ Pour run l'unique test actuel, utilisez les commandes suivante dans cet ordre:\
 `make run_sender`\
 Il existe encore un bug de segmentation fault lors du run du sender avant le receiver,
 celui ci devrait etre corrigé sous peu
+
+### Tests aléatoires
+Vous pouvez run un test aléatoire en faisant `./test_perf.sh X` avec X le nombre de bytes du fichier à échanger\
+Les données de taille et de temps seront sauvegardées dans perf.csv\
+Si vous voulez run une série de test croissant avec des tailles aléatoire allant de 512 Bytes à plus de 10Mo lancer `./test_loop.sh`

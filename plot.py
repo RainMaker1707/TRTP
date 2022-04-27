@@ -11,16 +11,18 @@ if __name__ == "__main__":
         if not dic.get(key):
             dic[key] = (1, value)
         else:
-            if not value <= 0.5*dic.get(key)[0]/dic.get(key)[1]:  # escape bullshit  values
-                dic[key] = (dic.get(key)[0]+1, dic.get(key)[1]+value)
-    x_tab, y_tab = [], []
+            dic[key] = (dic.get(key)[0]+1, dic.get(key)[1]+value)
+    temp_tab = []
     for key in dic.keys():
         val = dic.get(key)
         dic[key] = val[1]/val[0]
-        y_tab.append(dic.get(key))
-        x_tab.append(key)
-    print(x_tab)
-    print(y_tab)
+        temp_tab.append((key, dic.get(key)))
+    temp_tab.sort()
+    x_tab = [elem[0] for elem in temp_tab]
+    y_tab = [elem[1] for elem in temp_tab]
     fig, ax = plt.subplots()
     ax.plot(x_tab, y_tab, linewidth=2.0)
+    ax.set_title("Perfect network transfer simulation")
+    ax.set_ylabel("Time (s)")
+    ax.set_xlabel("Number of bytes")
     plt.show()

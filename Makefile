@@ -82,7 +82,7 @@ run_receiver:
 	make all
 	./receiver :: 8080 2>receiver.log
 
-IN=scribe.txt
+IN=stargate.jpeg
 FILE=-f $(IN)
 sender_o:
 	make all

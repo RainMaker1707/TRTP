@@ -10,5 +10,14 @@ else
     echo "File of $1 bytes created"
     # first column number of bytes to transfer, second column time to transfer
     /usr/bin/time -o perf.csv -a -f  "${1}, %e" ./test.sh "${1}"
+    diff input_file received_file > diff_file
+    value=$(wc -c diff_file | xargs | cut -d ' ' -f1)
+    if [ $value -eq 0 ]; then
+	echo "Test: all ok."
+    elif [ $value -gt 0 ]; then
+	echo "Test: file corrupted."
+    else
+	echo "Error in tests."
+    fi
     rm -f input_file received_file diff_file # garbage
 fi
